@@ -18,6 +18,7 @@ type Prepared={config:Config;entries:Entry[];radar:RadarFile[];reports:Report[];
 const BACKEND=typeof window!=='undefined'&&window.location.hostname.endsWith('.github.io')?'https://launch-weather-replay.bciz392.chatgpt.site':'';
 const mb=(n:number)=>n>=1e9?(n/1e9).toFixed(2)+' GB':(n/1e6).toFixed(1)+' MB';
 const fmt=(s:string|null)=>s?new Date(s).toISOString().slice(11,19)+' UTC':'No data';
+const addMinutes=(value:string,minutes:number)=>new Date(Date.parse(value+'Z')+minutes*60000).toISOString().slice(0,16);
 function Choice({value,change,items,label}:{value:string;change:(s:string)=>void;items:[string,string][];label:string}){return <Select value={value} onValueChange={change}><SelectTrigger aria-label={label}><SelectValue/></SelectTrigger><SelectContent>{items.map(([k,v])=><SelectItem key={k} value={k}>{v}</SelectItem>)}</SelectContent></Select>;}
 export default function Home(){
  const [name,setName]=useState('Cape weather scenario'),[start,setStart]=useState('2024-06-25T21:00'),[end,setEnd]=useState('2024-06-25T23:00'),[radar,setRadar]=useState('KMLB');
@@ -27,6 +28,8 @@ export default function Home(){
  const abort=useRef<AbortController|null>(null);
  const reset=()=>{setPrepared(null);setErrors([]);setPartial(false);setSubmitted(false);setStatus('');};
  const update=(fn:()=>void)=>{reset();fn();};
+ const changeStart=(value:string)=>update(()=>{setStart(value);if(value&&end&&Date.parse(end+'Z')<=Date.parse(value+'Z'))setEnd(addMinutes(value,60));});
+ const changeEnd=(value:string)=>update(()=>setEnd(value&&start&&Date.parse(value+'Z')<=Date.parse(start+'Z')?addMinutes(start,60):value));
  async function api(path:string,params:Record<string,string>,signal:AbortSignal){const r=await fetch(BACKEND+path+'?'+new URLSearchParams(params),{signal});const data=await r.json();if(!r.ok||data.error)throw Error(data.error||'Source request failed.');return data;}
  async function prepare(){
   reset();setBusy(true);setProgress(0);const controller=new AbortController();abort.current=controller;
@@ -101,9 +104,9 @@ export default function Home(){
   <div className="work-grid"><div className="stack"><fieldset disabled={busy} className="panel" style={{minWidth:0}}>
    <h2><span className="step">01</span> Define the scenario</h2>
    <label>Scenario name<Input maxLength={100} value={name} onChange={e=>update(()=>setName(e.target.value))}/></label>
-   <div className="two-col"><label>Start · UTC<Input type="datetime-local" step="60" value={start} onChange={e=>update(()=>setStart(e.target.value))}/></label><label>End · UTC<Input type="datetime-local" step="60" value={end} onChange={e=>update(()=>setEnd(e.target.value))}/></label></div>
+   <div className="two-col"><label>Start · UTC (24-hour)<Input type="datetime-local" lang="en-GB" step="60" value={start} onChange={e=>changeStart(e.target.value)}/></label><label>End · UTC (24-hour)<Input type="datetime-local" lang="en-GB" step="60" min={start?addMinutes(start,1):undefined} value={end} onChange={e=>changeEnd(e.target.value)}/></label></div>
    <label>Radar identifier<Input maxLength={4} value={radar} onChange={e=>update(()=>setRadar(e.target.value.toUpperCase()))} placeholder="KMLB" spellCheck={false}/></label>
-   <p className="note">KMLB is Melbourne NEXRAD. Example dates are prefilled; edit for your event. UTC only, up to 12 hours and 2 GB per package.</p>
+   <p className="note">KMLB is Melbourne NEXRAD. Times use 24-hour UTC. If the start moves to or beyond the end, the end automatically moves one hour later. Windows may be up to 12 hours and 2 GB per package.</p>
    <h2 style={{marginTop:28}}><span className="step">02</span> Choose local observations</h2>
    <div className="notice">Radar, towers, and field mills request archive data automatically. KSC requests support 2024 and 2026; source availability is checked below. MERLIN CG and CC are retrieved automatically, including the selected lookback. GR playback needs validation.</div>
    {layers.map(layer=>{const checked=selected.includes(layer.key);return <div className="source" key={layer.key}><div className="source-head"><Checkbox id={layer.key} checked={checked} onCheckedChange={v=>update(()=>setSelected(v?[...selected,layer.key]:selected.filter(k=>k!==layer.key)))}/><layer.icon size={18}/><label htmlFor={layer.key}>{layer.name}</label><span className="status">{uploads[layer.key]?.length?'FILE IMPORT':layer.mode}</span></div><p>{layer.detail}</p>{checked&&<>
