@@ -1,14 +1,13 @@
-import { KSC, readLimited } from './archive';
+import { KSC, encodeKscDate, readLimited } from './archive';
 import { csv, utc, grtime, validate, type Config } from './replay';
 import type { ZipFile } from './zip';
 export type MerlinType='CG'|'CC';
 export type MerlinSource={type:MerlinType;start:string;end:string;sha256:string;records:number;rejected:number;url:string};
-const MIN=60000, STEP=5*MIN, alphabet='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz01234567';
+const MIN=60000, STEP=5*MIN;
 export function merlinURL(type:MerlinType,start:string,end:string){
  const a=new Date(start),b=new Date(end);
  if(!['CG','CC'].includes(type)||!Number.isFinite(+a+ +b)||+b<=+a||+b- +a>STEP||+a%MIN||+b%MIN)throw Error('MERLIN requests require whole UTC minutes, up to five minutes per request.');
- const encode=(d:Date)=>{const y=d.getUTCFullYear();if(![2024,2026].includes(y))throw Error('MERLIN date encoding is checked for 2024 and 2026.');return (y===2024?'BY':'Ba')+[d.getUTCMonth()+1,d.getUTCDate(),d.getUTCHours(),d.getUTCMinutes()].map(n=>alphabet[n]).join('');};
- return `${KSC}MerlinCloudTo${type==='CG'?'Ground':'Cloud'}/Export/${encode(a)}A${encode(b)}${type==='CG'?'AAAAABaAAA':'AAA'}`;
+ return `${KSC}MerlinCloudTo${type==='CG'?'Ground':'Cloud'}/Export/${encodeKscDate(a)}A${encodeKscDate(b)}${type==='CG'?'AAAAABaAAA':'AAA'}`;
 }
 export function merlinRequests(c:Config){const {a,b}=validate(c);if(a%MIN||b%MIN)throw Error('MERLIN scenarios must start and end on whole UTC minutes.');const out:{type:MerlinType;start:string;end:string}[]=[];for(const type of ['CG','CC'] as const)for(let t=a-c.lightningMinutes*MIN;t<b;t+=STEP)out.push({type,start:new Date(t).toISOString(),end:new Date(Math.min(t+STEP,b)).toISOString()});return out;}
 export function coordinate(s:string){if(!s?.trim())return NaN;if(!s.includes(':'))return Number(s);const m=/^(-?\d+):(\d+):(\d+(?:\.\d+)?)$/.exec(s);if(!m||+m[2]>=60||+m[3]>=60)return NaN;return (s.startsWith('-')?-1:1)*(Math.abs(+m[1])+(+m[2])/60+(+m[3])/3600);}
