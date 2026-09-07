@@ -1,0 +1,2 @@
+import { baseConfig, radarFiles } from '@/lib/archive';
+export async function GET(req:Request){try{const p=new URL(req.url).searchParams;const files=await radarFiles(baseConfig(p.get('start')||'',p.get('end')||'',p.get('radar')||''));return Response.json({files},{headers:{'Cache-Control':'no-store','Access-Control-Allow-Origin':'*'}});}catch(e){return Response.json({error:e instanceof Error?e.message:'Radar request failed.'},{status:400,headers:{'Access-Control-Allow-Origin':'*'}});}}
