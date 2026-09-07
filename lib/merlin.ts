@@ -1,8 +1,8 @@
 import { KSC, encodeKscDate, readLimited } from './archive';
-import { csv, utc, grtime, validate, type Config } from './replay';
-import type { ZipFile } from './zip';
+import { csv, utc, grtime, validate, type Config, type Entry } from './replay';
 export type MerlinType='CG'|'CC';
 export type MerlinSource={type:MerlinType;start:string;end:string;sha256:string;records:number;rejected:number;url:string};
+export type MerlinChunk={source:MerlinSource;text:string};
 const MIN=60000, STEP=5*MIN;
 export function merlinURL(type:MerlinType,start:string,end:string){
  const a=new Date(start),b=new Date(end);
@@ -39,16 +39,14 @@ export class DensityWindow{
  add(events:Detection[]){for(const e of events){const minute=Math.floor(e.time/MIN)*MIN;let bin=this.minutes.get(minute);if(!bin){bin=new Map();this.minutes.set(minute,bin);}const key=cellKey(e.lat,e.lon);bin.set(key,(bin.get(key)||0)+1);}}
  counts(t:number,trail:number){const counts=new Map<string,number>();for(const [minute,bin] of this.minutes){if(minute<t-trail){this.minutes.delete(minute);continue;}if(minute>=t)continue;for(const [key,n] of bin)counts.set(key,(counts.get(key)||0)+n);}return counts;}
 }
-function stream(iterator:AsyncGenerator<string>,signal?:AbortSignal){const enc=new TextEncoder();return new ReadableStream<Uint8Array>({async pull(c){try{signal?.throwIfAborted();const r=await iterator.next();if(r.done)c.close();else c.enqueue(enc.encode(r.value));}catch(e){c.error(e);await iterator.return(undefined);}},async cancel(){await iterator.return(undefined);}});}
-export function merlinFiles(c:Config,sources:MerlinSource[],signal?:AbortSignal):ZipFile[]{
- const checked=checkedSources(c,sources),{a,b}=validate(c),trail=c.lightningMinutes*MIN;
- async function* cg(){yield `Title: MERLIN CG / trailing ${c.lightningMinutes} min\nThreshold: 999\nFont: 1, 13, 1, "Arial"\n`;for(const s of checked.filter(s=>s.type==='CG')){const {events}=await fetchMerlin(s,signal);let text='';for(const e of events){const start=Math.max(a,Math.floor(e.time/1000)*1000+(e.subsecond?1000:0)),end=Math.floor(Math.min(b,e.time+trail)/1000)*1000;if(end<=start)continue;const signalText=e.signal.replace(/[^0-9.+-]/g,'');text+=`TimeRange: ${grtime(start)} ${grtime(end)}\nColor: 255 210 80\nText: ${e.lat}, ${e.lon}, 1, "+", "CG detection / ${new Date(e.time).toISOString()} / signal strength ${signalText} (source units)"\n`;if(text.length>64000){yield text;text='';}}if(text)yield text;}}
- async function* cc(){yield `Title: MERLIN CC density / approximately 1 km / trailing ${c.lightningMinutes} min\nThreshold: 999\nFont: 1, 12, 1, "Arial"\n; Counts are detection records, not flashes. Each minute T counts [T-trail,T).\n; Density colors: blue 1-4, cyan 5-19, green 20-49, yellow 50-99, orange 100-249, red 250+.\n`;const queue=checked.filter(s=>s.type==='CC'),window=new DensityWindow();let index=0;
- for(let t=a;t<b;t+=MIN){while(index<queue.length&&Date.parse(queue[index].start)<t){const s=queue[index++];window.add((await fetchMerlin(s,signal)).events);}const counts=window.counts(t,trail);yield `TimeRange: ${grtime(t)} ${grtime(Math.min(t+MIN,b))}\n`;let text='Triangles:\n',total=0;for(const [key,n] of counts){total+=n;const [i,j]=key.split(',').map(Number);for(const [x,y] of [[i,j],[i+1,j],[i+1,j+1],[i,j],[i+1,j+1],[i,j+1]])text+=`${(28.5+y/KM_LAT).toFixed(7)}, ${(-80.6+x/KM_LON).toFixed(7)}, ${color(n)}, 90\n`;if(text.length>64000){yield text;text='';}}if(counts.size)yield text+'End:\n';yield `Color: 255 255 255\nText: 28.36, -80.46, 1, "CC density ${grtime(t).slice(11,16)}Z / ${c.lightningMinutes} min / 1 km", "${total} detection records in ${counts.size} occupied cells. End-exclusive window."\n`;}
- // Verify final source chunks too, including records after the last displayed frame.
- while(index<queue.length)await fetchMerlin(queue[index++],signal);
- }
- const files:ZipFile[]=[{name:'placefiles/merlin_cg.txt',data:async()=>stream(cg(),signal)},{name:'placefiles/merlin_cc_density.txt',data:async()=>stream(cc(),signal)}];
- for(const [i,s] of checked.entries())files.push({name:`raw/merlin_${s.type.toLowerCase()}_${String(i+1).padStart(3,'0')}.csv`,data:async()=>new TextEncoder().encode((await fetchMerlin(s,signal)).text)});
- return files;
+export const merlinRawName=(s:MerlinSource,i:number)=>`raw/merlin_${s.type.toLowerCase()}_${String(i+1).padStart(3,'0')}.csv`;
+export function merlinEntries(c:Config,chunks:MerlinChunk[]):Entry[]{
+ const checked=checkedSources(c,chunks.map(x=>x.source)),{a,b}=validate(c),trail=c.lightningMinutes*MIN;
+ const parsed=chunks.map((chunk,i)=>({source:checked[i],text:chunk.text,events:parseMerlin(chunk.text,Date.parse(checked[i].start),Date.parse(checked[i].end)).events}));
+ let cg=`Title: MERLIN CG / trailing ${c.lightningMinutes} min\nThreshold: 999\nFont: 1, 13, 1, "Arial"\n`;
+ for(const chunk of parsed.filter(x=>x.source.type==='CG'))for(const e of chunk.events){const start=Math.max(a,Math.floor(e.time/1000)*1000+(e.subsecond?1000:0)),end=Math.floor(Math.min(b,e.time+trail)/1000)*1000;if(end<=start)continue;const signalText=e.signal.replace(/[^0-9.+-]/g,'');cg+=`TimeRange: ${grtime(start)} ${grtime(end)}\nColor: 255 210 80\nText: ${e.lat}, ${e.lon}, 1, "+", "CG detection / ${new Date(e.time).toISOString()} / signal strength ${signalText} (source units)"\n`;}
+ let cc=`Title: MERLIN CC density / approximately 1 km / trailing ${c.lightningMinutes} min\nThreshold: 999\nFont: 1, 12, 1, "Arial"\n; Counts are detection records, not flashes. Each minute T counts [T-trail,T).\n; Density colors: blue 1-4, cyan 5-19, green 20-49, yellow 50-99, orange 100-249, red 250+.\n`,window=new DensityWindow();
+ for(const chunk of parsed.filter(x=>x.source.type==='CC'))window.add(chunk.events);
+ for(let t=a;t<b;t+=MIN){const counts=window.counts(t,trail);cc+=`TimeRange: ${grtime(t)} ${grtime(Math.min(t+MIN,b))}\n`;let triangles='Triangles:\n',total=0;for(const [key,n] of counts){total+=n;const [i,j]=key.split(',').map(Number);for(const [x,y] of [[i,j],[i+1,j],[i+1,j+1],[i,j],[i+1,j+1],[i,j+1]])triangles+=`${(28.5+y/KM_LAT).toFixed(7)}, ${(-80.6+x/KM_LON).toFixed(7)}, ${color(n)}, 90\n`;}if(counts.size)cc+=triangles+'End:\n';cc+=`Color: 255 255 255\nText: 28.36, -80.46, 1, "CC density ${grtime(t).slice(11,16)}Z / ${c.lightningMinutes} min / 1 km", "${total} detection records in ${counts.size} occupied cells. End-exclusive window."\n`;}
+ return [{name:'placefiles/merlin_cg.txt',text:cg},{name:'placefiles/merlin_cc_density.txt',text:cc},...parsed.map((x,i)=>({name:merlinRawName(x.source,i),text:x.text}))];
 }
