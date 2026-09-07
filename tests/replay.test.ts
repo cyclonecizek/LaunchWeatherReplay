@@ -8,6 +8,8 @@ assert(Number.isNaN(utc('02/30/2026','18:00:00')));
 assert.equal(utc('08/10/2026','18:00:00'),Date.parse(c.start));
 assert.equal(kscURL('fieldmills',0,'2024-06-25T20:58Z','2024-06-25T21:58Z').split('/Export/')[1], 'BYGZU6ABYGZV6AAAABaAABACAEAFAGAHAIAJAKALAMANAOAPAQARASATAUAVAWAXAYAZAaAbAcAdAeAfAgAhAiAj');
 assert(kscURL('fieldmills',0,'2026-08-11T14:00Z','2026-08-11T14:10Z').endsWith('BaILOAABaILOKAAAABaAABACAEAFAGAHAIAJAKALAMANAOAPAQARASATAUAVAWAXAYAZAaAbAcAdAeAfAgAhAiAj'));
+assert(kscURL('fieldmills',0,'2010-01-02T03:04Z','2010-01-02T03:05Z').includes('/Export/BKBCDEA'));
+assert.throws(()=>kscURL('fieldmills',0,'1999-12-31T23:00Z','1999-12-31T23:10Z'),/2000 through 2059/);
 const field=parse('fieldmills','OneMinuteMean,Date,Time,MillNo\n-1400,08/10/2026,18:00:00,1\n250,08/10/2026,18:20:00,1\n-1400,08/10/2026,18:00:00,1\n');
 assert.equal(field.obs.length,2);assert.equal(field.obs[0].value,-1400);
 const f=generate('fieldmills',field.obs,c);
