@@ -1,7 +1,7 @@
 # Launch Weather Replay
 
 Scenario builder for GR2Analyst. Select an archived UTC time range, NEXRAD site,
-and KSC observation layers, check source coverage, then download a streaming ZIP
+and KSC observation layers, check source coverage, then download a streaming TAR
 with original radar volumes, synchronized placefiles, raw observations, and a
 coverage manifest.
 
@@ -10,11 +10,11 @@ coverage manifest.
 - NEXRAD inventory/download: Unidata's `unidata-nexrad-level2` archive, paginated by UTC day; MDM files excluded. Maximum 12 hours / 2 GB radar per bundle.
 - KSC tower retrieval: four export groups from Brian Cizek's WINDS_Placefile implementation, split into one-hour chunks. The archive year token supports 2000 through 2059; actual sensor availability is checked for the selected period.
 - Field mills: automatic retrieval of signed one-minute means using the same 2000–2059 archive year encoding. Manual CSV import is also supported.
-- MERLIN: automatic Cloud-to-Ground and Cloud-to-Cloud retrieval in five-minute intervals, including the selected lookback before the replay begins. Checked source data is reused during ZIP assembly to avoid repeated Worker subrequests. CG detections remain individual markers. CC detections are grouped into approximately 1 km density cells refreshed once per minute.
+- MERLIN: automatic Cloud-to-Ground and Cloud-to-Cloud retrieval in five-minute intervals, including the selected lookback before the replay begins. Checked source data is reused during TAR assembly to avoid repeated Worker subrequests. CG detections remain individual markers. CC detections are grouped into approximately 1 km density cells refreshed once per minute.
 - Wind profilers are intentionally deferred.
 - TimeRange v1.5 generation is implemented, but GR2Analyst native playback has NOT been tested. A clock-check placefile is included for the user's installed GR build.
 - Only NEXRAD sites with matching public archive keys are retrieved. Cape non-NEXRAD WSR is not connected.
-- No scenario database or upload persistence. Download requests carry observation text to the server for ZIP packaging.
+- No scenario database or upload persistence. Download requests carry observation text to the server for TAR packaging.
 
 ## Time semantics
 
@@ -32,7 +32,7 @@ Station coordinates and wind icon: https://github.com/cyclonecizek/WINDS_Placefi
 
 `tests/replay.test.ts` checks date parsing, archive token construction, signed
 electric fields, coordinate joins, tower selection, missing-data expiry, future
-exclusion, radar key filtering, and streaming ZIP assembly. `tests/merlin.test.ts`
+exclusion, radar key filtering, and streaming TAR assembly. `tests/merlin.test.ts`
 checks MERLIN tokens, coordinate formats, interval boundaries, trail expiry,
 subsecond times, grouped CC cells, and source hash consistency. `npm run build`
 creates the Worker and browser assets.
@@ -48,7 +48,7 @@ observations.
 ## Cloudflare deployment
 
 This is a full-stack Cloudflare Worker application. It serves the interface and the
-server-side radar, KSC, MERLIN, and ZIP routes from one deployment.
+server-side radar, KSC, MERLIN, and TAR routes from one deployment.
 
 In Cloudflare Workers Builds, use:
 
