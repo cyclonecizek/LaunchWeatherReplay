@@ -7,7 +7,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Progress } from '@/components/ui/progress';
 import { generate, parse, probe, templates, validate, type Config, type Entry, type Kind, type Observation, type RadarFile, type Report } from '@/lib/replay';
-import { merlinRequests, type MerlinSource } from '@/lib/merlin';
+import { merlinEntries, merlinRequests, type MerlinChunk, type MerlinSource } from '@/lib/merlin';
 import { KSC_MIN_YEAR, KSC_MAX_YEAR } from '@/lib/archive';
 const layers:{key:Kind;name:string;detail:string;icon:typeof Wind;mode:string}[]=[
  {key:'winds',name:'Wind towers',detail:'Surface, 54 ft, lowest available, or 200+ ft.',icon:Wind,mode:'AUTO · 2000–2059'},
@@ -45,6 +45,7 @@ export default function Home(){
    const {a,b}=validate(c);setStatus('Finding archived Level II volumes…');
    result.radar=(await api('/api/radar',{start:c.start,end:c.end,radar:c.radar},controller.signal)).files;
    if(!result.radar.length)throw Error('No radar volumes found for this site and time window. Check the radar identifier and dates.');
+   if(result.radar.length>45)throw Error(`This window contains ${result.radar.length} radar volumes. Cloudflare can safely package up to 45 at once; choose a shorter window.`);
    const size=result.radar.reduce((s,f)=>s+f.size,0);if(size>2e9)throw Error('Radar alone exceeds 2 GB. Choose a shorter time window.');
    result.sources.push({kind:'radar',source:'https://registry.opendata.aws/noaa-nexrad/'});
    setProgress(15);
@@ -75,14 +76,14 @@ export default function Home(){
        if(!good){failed=true;break;}
       }
      }else if(kind==='lightning'){
-      const requests=merlinRequests(c),sources:MerlinSource[]=[];
+      const requests=merlinRequests(c),sources:MerlinSource[]=[],chunks:MerlinChunk[]=[];
       for(let j=0;j<requests.length;j++){
        const request=requests[j];setStatus(`Fetching MERLIN ${request.type}, interval ${j+1} of ${requests.length}…`);
-       sources.push(await api('/api/merlin',request,controller.signal));
+       const chunk=await api('/api/merlin',request,controller.signal) as MerlinChunk;chunks.push(chunk);sources.push(chunk.source);
        setProgress(15+80*(i+(j+1)/requests.length)/c.layers.length);
       }
       const count=sources.reduce((n,s)=>n+s.records,0),rejected=sources.reduce((n,s)=>n+s.rejected,0);
-      result.merlin=sources;result.sources.push(...sources.map(s=>({kind:'lightning',source:s.url})));
+      result.merlin=sources;result.entries.push(...merlinEntries(c,chunks));result.sources.push(...sources.map(s=>({kind:'lightning',source:s.url})));
       result.reports.push({kind,records:count,plotted:count,first:requests[0].start,last:c.end,sites:2,intervals:[],notes:[`Retrieved ${sources.filter(s=>s.type==='CG').reduce((n,s)=>n+s.records,0).toLocaleString()} CG and ${sources.filter(s=>s.type==='CC').reduce((n,s)=>n+s.records,0).toLocaleString()} CC records, including the ${c.lightningMinutes}-minute lookback.`,`${rejected} invalid records excluded. No invented quality flag or flash identification.`,`CC: approximately 1 km cells, refreshed every minute, counting [frame time minus trail, frame time). Colors show record density; observations may take up to one minute to appear or expire.`,`CG: individual markers, expiring after ${c.lightningMinutes} minutes.`,`All archive intervals responded. Empty results do not establish sensor uptime. ZIP generation rechecks the source hashes and stops if data change.`]});
       setProgress(15+80*(i+1)/c.layers.length);continue;
      }else throw Error('Unsupported source.');
@@ -139,7 +140,7 @@ export default function Home(){
    {prepared.reports.map(r=><div className="result" key={r.kind}><b>{layers.find(l=>l.key===r.kind)?.name}</b><p>{r.plotted.toLocaleString()} {r.kind==='lightning'&&prepared.merlin?'retrieved records, including lookback':'plotted records'} · {r.sites} {r.kind==='lightning'?'detection types':'sites'}<br/>{fmt(r.first)} to {fmt(r.last)}</p><details><summary>Coverage and time rules</summary>{r.notes.map((n,i)=><p key={i}>{n}</p>)}<p>Intervals with at least one displayed record: {r.intervals.length}. This does not establish complete network coverage.</p></details></div>)}
    {!!prepared.missing.length&&<label style={{display:'flex',alignItems:'flex-start',gap:10,marginTop:20}}><Checkbox checked={partial} onCheckedChange={v=>setPartial(v===true)}/>Download the available data as a partial scenario; list missing sources in the package.</label>}
    <Button className="action" disabled={prepared.missing.length>0&&!partial} onClick={download}><Download size={18}/>{prepared.missing.length?'Download partial scenario':'Download scenario ZIP'}</Button>
-   {submitted&&<p className="note" role="status">Download requested in a new tab. Radar and automatic MERLIN placefiles stream into the ZIP. Large lightning scenarios can take several minutes. After it finishes, extract it and confirm manifest.json is present. If a source error appears, refresh coverage and retry.</p>}
+   {submitted&&<p className="note" role="status">Download requested in a new tab. The checked MERLIN data is reused while radar files stream into the ZIP. After it finishes, extract it and confirm manifest.json is present. If a source error appears, refresh coverage and retry.</p>}
    </>}
    {!prepared&&<div className="summary"><div className="zip-list"><FileArchive size={24}/><div><p style={{margin:0,color:'#e0eef9'}}>One folder for the replay</p><p className="note">Radar volumes, time-windowed placefiles, raw observations, and a coverage manifest.</p></div></div><ul className="files"><li><span>radar/</span> original Level II files</li><li><span>placefiles/</span> selected layers + clock check</li><li><span>raw/</span> source observations</li><li><span>manifest.json</span> time rules & missing data</li><li><span>README.txt</span> GR loading instructions</li></ul></div>}
   </section><section className="panel"><h2><Clock3 size={19} color="#88d8f5"/> One replay clock</h2><p>Each observation receives a UTC validity window. The intended behavior is for GR to select the appropriate observations as you play, pause, or step through archived radar.</p><p className="note">Towers expire after 7 minutes, mills after 2, or sooner when replaced. Lightning uses your selected trail. Future observations are excluded, and gaps remain visible.</p><div className="notice">Start with replay_clock_check.txt in GR. It is included to verify time matching on your installed version before relying on synchronized playback.</div><p className="note">After downloading: extract the ZIP, run FIX_ICON_PATHS.cmd once, open the radar files, and add the local placefiles in GR’s Placefile Manager.</p></section></div>
