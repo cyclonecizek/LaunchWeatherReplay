@@ -20,6 +20,11 @@ const mb=(n:number)=>n>=1e9?(n/1e9).toFixed(2)+' GB':(n/1e6).toFixed(1)+' MB';
 const fmt=(s:string|null)=>s?new Date(s).toISOString().slice(11,19)+' UTC':'No data';
 const addMinutes=(value:string,minutes:number)=>new Date(Date.parse(value+'Z')+minutes*60000).toISOString().slice(0,16);
 function Choice({value,change,items,label}:{value:string;change:(s:string)=>void;items:[string,string][];label:string}){return <Select value={value} onValueChange={change}><SelectTrigger aria-label={label}><SelectValue/></SelectTrigger><SelectContent>{items.map(([k,v])=><SelectItem key={k} value={k}>{v}</SelectItem>)}</SelectContent></Select>;}
+function DateTime24({id,label,value,change}:{id:string;label:string;value:string;change:(s:string)=>void}){
+ const [date='',clock='00:00']=value.split('T'),[hour='00',minute='00']=clock.split(':');
+ const hours=Array.from({length:24},(_,i)=>String(i).padStart(2,'0')),minutes=Array.from({length:60},(_,i)=>String(i).padStart(2,'0'));
+ return <div className="date-time-field" role="group" aria-labelledby={`${id}-label`}><span id={`${id}-label`}>{label} · UTC (24-hour)</span><div className="date-time-row"><Input aria-label={`${label} date`} type="date" value={date} onChange={e=>change(`${e.target.value}T${hour}:${minute}`)}/><div className="clock24"><select aria-label={`${label} hour, 00 through 23`} value={hour} onChange={e=>change(`${date}T${e.target.value}:${minute}`)}>{hours.map(v=><option key={v} value={v}>{v}</option>)}</select><span aria-hidden="true">:</span><select aria-label={`${label} minute`} value={minute} onChange={e=>change(`${date}T${hour}:${e.target.value}`)}>{minutes.map(v=><option key={v} value={v}>{v}</option>)}</select><span className="utc-mark">Z</span></div></div></div>;
+}
 export default function Home(){
  const [name,setName]=useState('Cape weather scenario'),[start,setStart]=useState('2024-06-25T21:00'),[end,setEnd]=useState('2024-06-25T23:00'),[radar,setRadar]=useState('KMLB');
  const [selected,setSelected]=useState<Kind[]>(['winds','fieldmills','lightning']);
@@ -97,6 +102,7 @@ export default function Home(){
  function download(){if(!prepared)return;const form=document.createElement('form');form.method='POST';form.action=BACKEND+'/api/bundle';form.target='_blank';const input=document.createElement('input');input.type='hidden';input.name='payload';input.value=JSON.stringify(prepared);form.append(input);document.body.append(form);form.submit();form.remove();setSubmitted(true);}
  function template(kind:string){const url=URL.createObjectURL(new Blob([templates[kind]],{type:'text/csv'}));const a=document.createElement('a');a.href=url;a.download=kind+'-import-template.csv';a.click();setTimeout(()=>URL.revokeObjectURL(url),10000);}
  const duration=(Date.parse(end+'Z')-Date.parse(start+'Z'))/3600000;
+ const ordered=Number.isFinite(duration)&&duration>0;
  const bytes=prepared?.radar.reduce((s,f)=>s+f.size,0)||0;
  return <main className="workspace">
   <header><div className="brand"><Radar size={25}/><span>LAUNCH WEATHER / REPLAY</span></div><span className="tag">GR2Analyst · archive mode</span></header>
@@ -104,7 +110,7 @@ export default function Home(){
   <div className="work-grid"><div className="stack"><fieldset disabled={busy} className="panel" style={{minWidth:0}}>
    <h2><span className="step">01</span> Define the scenario</h2>
    <label>Scenario name<Input maxLength={100} value={name} onChange={e=>update(()=>setName(e.target.value))}/></label>
-   <div className="two-col"><label>Start · UTC (24-hour)<Input type="datetime-local" lang="en-GB" step="60" value={start} onChange={e=>changeStart(e.target.value)}/></label><label>End · UTC (24-hour)<Input type="datetime-local" lang="en-GB" step="60" min={start?addMinutes(start,1):undefined} value={end} onChange={e=>changeEnd(e.target.value)}/></label></div>
+   <div className="two-col"><DateTime24 id="start" label="Start" value={start} change={changeStart}/><DateTime24 id="end" label="End" value={end} change={changeEnd}/></div>
    <label>Radar identifier<Input maxLength={4} value={radar} onChange={e=>update(()=>setRadar(e.target.value.toUpperCase()))} placeholder="KMLB" spellCheck={false}/></label>
    <p className="note">KMLB is Melbourne NEXRAD. Times use 24-hour UTC. If the start moves to or beyond the end, the end automatically moves one hour later. Windows may be up to 12 hours and 2 GB per package.</p>
    <h2 style={{marginTop:28}}><span className="step">02</span> Choose local observations</h2>
@@ -123,7 +129,8 @@ export default function Home(){
   <div className="stack"><section className="panel">
    <h2><span className="step">03</span> Check coverage & download</h2>
    <div className="metrics"><div><p className="small-title">REQUESTED WINDOW</p><div className="summary" style={{margin:0}}><div className="big">{Number.isFinite(duration)&&duration>0?duration.toFixed(1):'—'} <span style={{fontSize:18}}>hours</span></div><div className="metric-label">All timestamps in UTC</div></div></div><div><p className="small-title">RADAR SOURCE</p><div className="summary" style={{margin:0}}><div className="big">{radar||'—'}</div><div className="metric-label">Archived Level II volumes</div></div></div></div>
-   <Button className="action" onClick={prepare} disabled={busy}>{busy?'Checking sources…':prepared?'Refresh coverage':'Check coverage'}<ArrowRight size={18}/></Button>
+   <Button className="action" onClick={prepare} disabled={busy||!ordered}>{busy?'Checking sources…':prepared?'Refresh coverage':'Check coverage'}<ArrowRight size={18}/></Button>
+   {!ordered&&<p className="error" role="alert" style={{marginTop:18}}>End time must be after the start time.</p>}
    {busy&&<Button variant="outline" className="secondary-action" onClick={()=>abort.current?.abort()}>Cancel</Button>}
    <div aria-live="polite">{status&&<p className="log">{status}</p>}{busy&&<Progress value={progress} aria-label="Source preparation progress" style={{marginTop:12}}/>}</div>
    {!!errors.length&&<div className="error" role="alert" style={{marginTop:18}}>{errors.join('\n\n')}</div>}
