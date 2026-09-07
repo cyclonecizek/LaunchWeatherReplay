@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { merlinURL,parseMerlin,coordinate,DensityWindow,cellKey,merlinRequests,merlinFiles,fetchMerlin, type MerlinSource } from '../lib/merlin';
+import { merlinURL,parseMerlin,coordinate,DensityWindow,cellKey,merlinRequests,merlinEntries,fetchMerlin, type MerlinChunk } from '../lib/merlin';
 import type { Config } from '../lib/replay';
 const c:Config={name:'test',start:'2024-06-25T21:00Z',end:'2024-06-25T21:02Z',radar:'KMLB',layers:['lightning'],windHeight:'54',lightningMinutes:1,profilerHeight:1000};
 assert(merlinURL('CC','2024-06-25T20:00Z','2024-06-25T20:05Z').endsWith('BYGZUAABYGZUFAAA'));
@@ -13,9 +13,9 @@ const parsed=parseMerlin(body,Date.parse('2024-06-25T20:59Z'),Date.parse(c.end))
 const w=new DensityWindow();w.add(parsed.events);assert.equal(w.counts(Date.parse(c.start),60000).get(cellKey(28.5,-80.6)),1);assert.equal(w.counts(Date.parse('2024-06-25T21:01Z'),60000).get(cellKey(28.5,-80.6)),1);
 const original=globalThis.fetch;globalThis.fetch=async()=>new Response(body);
 try{
- const sources:MerlinSource[]=[];for(const r of merlinRequests(c))sources.push((await fetchMerlin(r)).source);
- const files=merlinFiles(c,sources);const cg=await new Response(await files[0].data() as BodyInit).text();assert(cg.includes('TimeRange: 2024-06-25T21:00:01 2024-06-25T21:01:00'));assert(!cg.includes('21:02:01'));
- const cc=await new Response(await files[1].data() as BodyInit).text();assert.equal((cc.match(/1 detection records in 1 occupied cells/g)||[]).length,2);
- globalThis.fetch=async()=>new Response(body+'\n');await assert.rejects(()=>fetchMerlin(sources[0]),/changed/);
+ const chunks:MerlinChunk[]=[];for(const r of merlinRequests(c)){const fetched=await fetchMerlin(r);chunks.push({source:fetched.source,text:fetched.text});}
+ const entries=merlinEntries(c,chunks),cg=entries.find(x=>x.name==='placefiles/merlin_cg.txt')!.text;assert(cg.includes('TimeRange: 2024-06-25T21:00:01 2024-06-25T21:01:00'));assert(!cg.includes('21:02:01'));
+ const cc=entries.find(x=>x.name==='placefiles/merlin_cc_density.txt')!.text;assert.equal((cc.match(/1 detection records in 1 occupied cells/g)||[]).length,2);
+ globalThis.fetch=async()=>new Response(body+'\n');await assert.rejects(()=>fetchMerlin(chunks[0].source),/changed/);
 }finally{globalThis.fetch=original;}
-console.log('PASS: MERLIN tokens, DMS, half-open chunk boundaries, minute trail expiry, future exclusion, submillisecond CG rounding, streamed CC cells, source hash consistency.');
+console.log('PASS: MERLIN tokens, DMS, half-open chunk boundaries, minute trail expiry, future exclusion, submillisecond CG rounding, cached CC cells, source hash consistency.');
