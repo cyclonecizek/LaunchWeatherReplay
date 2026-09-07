@@ -4,6 +4,7 @@ import type { Config } from '../lib/replay';
 const c:Config={name:'test',start:'2024-06-25T21:00Z',end:'2024-06-25T21:02Z',radar:'KMLB',layers:['lightning'],windHeight:'54',lightningMinutes:1,profilerHeight:1000};
 assert(merlinURL('CC','2024-06-25T20:00Z','2024-06-25T20:05Z').endsWith('BYGZUAABYGZUFAAA'));
 assert(merlinURL('CG','2024-06-25T20:00Z','2024-06-25T20:05Z').endsWith('BYGZUAABYGZUFAAAAABaAAA'));
+assert(merlinURL('CC','2010-01-02T03:04Z','2010-01-02T03:05Z').endsWith('BKBCDEABKBCDFAAA'));
 assert.throws(()=>merlinURL('CC','2024-06-25T20:00Z','2024-06-25T20:06Z'));
 assert.equal(coordinate('-81:25:37'),-(81+25/60+37/3600));assert(Number.isNaN(coordinate('28:61:00')));
 const header='Date,Time,Latitude,Longitude,Signal Strength\n';
