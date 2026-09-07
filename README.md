@@ -10,7 +10,7 @@ coverage manifest.
 - NEXRAD inventory/download: Unidata's `unidata-nexrad-level2` archive, paginated by UTC day; MDM files excluded. Maximum 12 hours / 2 GB radar per bundle.
 - KSC tower retrieval: four export groups from Brian Cizek's WINDS_Placefile implementation, split into one-hour chunks. The archive year token supports 2000 through 2059; actual sensor availability is checked for the selected period.
 - Field mills: automatic retrieval of signed one-minute means using the same 2000–2059 archive year encoding. Manual CSV import is also supported.
-- MERLIN: automatic Cloud-to-Ground and Cloud-to-Cloud retrieval in five-minute intervals, including the selected lookback before the replay begins. CG detections remain individual markers. CC detections are grouped into approximately 1 km density cells refreshed once per minute.
+- MERLIN: automatic Cloud-to-Ground and Cloud-to-Cloud retrieval in five-minute intervals, including the selected lookback before the replay begins. Checked source data is reused during ZIP assembly to avoid repeated Worker subrequests. CG detections remain individual markers. CC detections are grouped into approximately 1 km density cells refreshed once per minute.
 - Wind profilers are intentionally deferred.
 - TimeRange v1.5 generation is implemented, but GR2Analyst native playback has NOT been tested. A clock-check placefile is included for the user's installed GR build.
 - Only NEXRAD sites with matching public archive keys are retrieved. Cape non-NEXRAD WSR is not connected.
