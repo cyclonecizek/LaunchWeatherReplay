@@ -3,6 +3,12 @@ import { validate, iso } from './replay';
 export const BUCKET='https://unidata-nexrad-level2.s3.amazonaws.com/';
 export const KSC='https://kscweather.ksc.nasa.gov/wxarchive/';
 const alphabet='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz01234567';
+export const KSC_MIN_YEAR=2000,KSC_MAX_YEAR=2059;
+export function encodeKscDate(d:Date){
+ const y=d.getUTCFullYear();
+ if(y<KSC_MIN_YEAR||y>KSC_MAX_YEAR)throw Error(`Automatic KSC export URLs support ${KSC_MIN_YEAR} through ${KSC_MAX_YEAR}.`);
+ return `B${alphabet[y-KSC_MIN_YEAR]}${[d.getUTCMonth()+1,d.getUTCDate(),d.getUTCHours(),d.getUTCMinutes()].map(n=>alphabet[n]).join('')}`;
+}
 const suffixes=[
 'AAAABaAAABaAAABaAABaAABaAABaAABaAaAndaBncnWaCnfaDnenXaEaFaGaHaIaMngaNnhnY',
 'AAAABaAAABaAAABaAABaAABaAABaAABaAaOaPaQaRaSnaaTnbnZaUaZaaabacadaeafagahai',
@@ -11,11 +17,9 @@ const suffixes=[
 export function kscURL(kind:string,group:number,start:string,end:string){
  const a=new Date(start),b=new Date(end);
  if(!Number.isFinite(+a+ +b)||+b<=+a||+b- +a>3600000)throw Error('KSC requests must span no more than one hour.');
- if(![2024,2026].includes(a.getUTCFullYear())||![2024,2026].includes(b.getUTCFullYear()))throw Error('KSC date encoding has been checked against exports for 2024 and 2026 only.');
  if(!['winds','fieldmills'].includes(kind)||!Number.isInteger(group)||group<0||group>(kind==='winds'?3:0))throw Error('Unsupported KSC source.');
- const enc=(d:Date)=>[d.getUTCMonth()+1,d.getUTCDate(),d.getUTCHours(),d.getUTCMinutes()].map(n=>alphabet[n]).join('');
  const suffix=kind==='winds'?suffixes[group]:'AAAABaAABACAEAFAGAHAIAJAKALAMANAOAPAQARASATAUAVAWAXAYAZAaAbAcAdAeAfAgAhAiAj';
- return `${KSC}${kind==='winds'?'WeatherTower':'FieldMill'}/Export/${a.getUTCFullYear()===2024?'BY':'Ba'}${enc(a)}A${b.getUTCFullYear()===2024?'BY':'Ba'}${enc(b)}${suffix}`;
+ return `${KSC}${kind==='winds'?'WeatherTower':'FieldMill'}/Export/${encodeKscDate(a)}A${encodeKscDate(b)}${suffix}`;
 }
 export const baseConfig=(start:string,end:string,radar='KMLB'):Config=>({name:'Replay',start,end,radar,layers:[],windHeight:'54',lightningMinutes:5,profilerHeight:1000});
 const unxml=(s:string)=>s.replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"').replace(/&apos;/g,"'");
