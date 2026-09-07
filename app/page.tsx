@@ -8,10 +8,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Progress } from '@/components/ui/progress';
 import { generate, parse, probe, templates, validate, type Config, type Entry, type Kind, type Observation, type RadarFile, type Report } from '@/lib/replay';
 import { merlinRequests, type MerlinSource } from '@/lib/merlin';
+import { KSC_MIN_YEAR, KSC_MAX_YEAR } from '@/lib/archive';
 const layers:{key:Kind;name:string;detail:string;icon:typeof Wind;mode:string}[]=[
- {key:'winds',name:'Wind towers',detail:'Surface, 54 ft, lowest available, or 200+ ft.',icon:Wind,mode:'AUTO · 2024/2026'},
- {key:'fieldmills',name:'Field mills',detail:'Signed one-minute electric field, V/m.',icon:Zap,mode:'AUTO · 2024/2026'},
- {key:'lightning',name:'MERLIN lightning',detail:'Individual CG detections and grouped CC density, with up to a one-hour trail.',icon:Zap,mode:'AUTO · 2024/2026'},
+ {key:'winds',name:'Wind towers',detail:'Surface, 54 ft, lowest available, or 200+ ft.',icon:Wind,mode:'AUTO · 2000–2059'},
+ {key:'fieldmills',name:'Field mills',detail:'Signed one-minute electric field, V/m.',icon:Zap,mode:'AUTO · 2000–2059'},
+ {key:'lightning',name:'MERLIN lightning',detail:'Individual CG detections and grouped CC density, with up to a one-hour trail.',icon:Zap,mode:'AUTO · 2000–2059'},
 ];
 type Source={kind:string;source:string};
 type Prepared={config:Config;entries:Entry[];radar:RadarFile[];reports:Report[];missing:string[];sources:Source[];merlin?:MerlinSource[]};
@@ -58,7 +59,7 @@ export default function Home(){
        result.entries.push({name:`raw/${kind}-import-${j+1}.csv`,text});result.sources.push({kind,source:'Imported file: '+files[j].name});
       }
      }else if(kind==='winds'||kind==='fieldmills'){
-      if(![2024,2026].includes(new Date(a).getUTCFullYear())||![2024,2026].includes(new Date(b).getUTCFullYear()))throw Error('Automatic KSC date encoding is currently checked for 2024 and 2026.');
+      if([new Date(a).getUTCFullYear(),new Date(b).getUTCFullYear()].some(y=>y<KSC_MIN_YEAR||y>KSC_MAX_YEAR))throw Error(`Automatic KSC export URLs support ${KSC_MIN_YEAR} through ${KSC_MAX_YEAR}.`);
       const lookback=kind==='winds'?7*60000:2*60000;let chunk=0;
       // Include antecedent observations at the start, splitting at UTC New Year.
       const begin=Math.max(a-lookback,Date.UTC(new Date(a).getUTCFullYear(),0,1));
@@ -114,7 +115,7 @@ export default function Home(){
    <label>Radar identifier<Input maxLength={4} value={radar} onChange={e=>update(()=>setRadar(e.target.value.toUpperCase()))} placeholder="KMLB" spellCheck={false}/></label>
    <p className="note">KMLB is Melbourne NEXRAD. Times use 24-hour UTC. If the start moves to or beyond the end, the end automatically moves one hour later. Windows may be up to 12 hours and 2 GB per package.</p>
    <h2 style={{marginTop:28}}><span className="step">02</span> Choose local observations</h2>
-   <div className="notice">Radar, towers, and field mills request archive data automatically. KSC requests support 2024 and 2026; source availability is checked below. MERLIN CG and CC are retrieved automatically, including the selected lookback. GR playback needs validation.</div>
+   <div className="notice">Radar, towers, and field mills request archive data automatically. KSC export URLs support 2000 through 2059; actual sensor availability is checked for the selected period. MERLIN CG and CC are retrieved automatically, including the selected lookback. GR playback needs validation.</div>
    {layers.map(layer=>{const checked=selected.includes(layer.key);return <div className="source" key={layer.key}><div className="source-head"><Checkbox id={layer.key} checked={checked} onCheckedChange={v=>update(()=>setSelected(v?[...selected,layer.key]:selected.filter(k=>k!==layer.key)))}/><layer.icon size={18}/><label htmlFor={layer.key}>{layer.name}</label><span className="status">{uploads[layer.key]?.length?'FILE IMPORT':layer.mode}</span></div><p>{layer.detail}</p>{checked&&<>
     {layer.key==='winds'&&<div className="source-settings"><label>Wind height<Choice label="Wind height" value={windHeight} change={v=>update(()=>setWindHeight(v))} items={[["surface","Surface · ≤20 ft"],["lowest","Lowest available"],["54","54 ft"],["200plus","Lowest ≥200 ft"]]}/></label></div>}
     {layer.key==='lightning'&&<div className="source-settings"><label>Detection trail<Choice label="Lightning trail" value={lightningMinutes} change={v=>update(()=>setLightningMinutes(v))} items={['1','5','10','15','30','45','60'].map(v=>[v,v+' minutes'])}/></label></div>}
