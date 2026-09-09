@@ -42,7 +42,7 @@ Automatic source requests still depend on NASA/S3 availability. KSC export token
 were verified against supplied 2024/2026 examples; other encoded years (2000–2059)
 remain inferred, not independently verified archive coverage. Missing data is
 reported rather than invented. The workflow does not bypass TLS checks or use
-browser session cookies.
+browser session cookies. On GitHub, the missing KSC intermediate certificate is fetched from its issuer (Sectigo), verified against the runner's trusted roots, and supplied to Node without disabling certificate or hostname verification.
 
 ## Development
 

@@ -7,6 +7,7 @@ on:
       - '.github/workflows/build-scenario.yml'
       - 'scripts/scenario-job.ts'
       - 'scripts/package-scenario.py'
+      - 'scripts/ksc-trust.sh'
       - 'tests/scenario-job.test.ts'
       - 'lib/merlin.ts'
       - 'lib/replay.ts'
@@ -83,10 +84,9 @@ jobs:
         run: npm ci --no-audit --no-fund
       - name: Check time handling and archive integrity
         run: npm run test:scenario
-      - name: Inspect KSC certificate chain
-        if: matrix.mode == 'Weather scenario'
-        run: |
-          timeout 20 openssl s_client -connect kscweather.ksc.nasa.gov:443 -servername kscweather.ksc.nasa.gov -showcerts </dev/null 2>/dev/null | openssl x509 -noout -subject -issuer -ext authorityInfoAccess
+      - name: Validate and load the missing KSC intermediate certificate
+        if: matrix.mode == 'Weather scenario' && (github.event_name == 'push' || inputs.winds || inputs.fieldmills || inputs.merlin)
+        run: bash scripts/ksc-trust.sh
       - name: Retrieve data and validate ZIP
         id: scenario
         env:
