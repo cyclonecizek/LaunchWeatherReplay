@@ -8,7 +8,7 @@ import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 import { BUCKET, radarFiles, kscURL, readLimited } from '../lib/archive';
-import { validate, parse, generate, probe, type Config, type Observation, type RadarFile } from '../lib/replay';
+import { validate, csv, parse, generate, probe, type Config, type Observation, type RadarFile } from '../lib/replay';
 import { merlinRequests, fetchMerlin, cgHeader, cgParts, ccParts, DensityWindow } from '../lib/merlin';
 import sprite from '../lib/barb-data.json';
 
@@ -120,7 +120,10 @@ export async function buildScenario(c: Config, root: string, allowPartial = fals
             if (!response.ok) { await response.body?.cancel(); throw Error(`KSC returned HTTP ${response.status}.`); }
             const text = await readLimited(response);
             if (/^\s*</.test(text)) throw Error('KSC returned HTML instead of CSV.');
-            const parsed = parse(kind, text);
+            const required = kind === 'winds' ? ['Date', 'Time', 'SiteName', 'Height', 'Average Wind Direction', 'Average Wind Speed'] : ['Date', 'Time', 'MillNo', 'OneMinuteMean'];
+            const empty = csv(text).length === 0;
+            if (empty && !required.every(h => text.split(/\r?\n/, 1)[0].includes(h))) throw Error('KSC returned unexpected CSV columns.');
+            const parsed = empty ? { obs: [], notes: [`No observations returned for group ${group + 1}, ${new Date(t).toISOString()}.`], total: 0 } : parse(kind, text);
             for (const o of parsed.obs) obs.push(o);
             notes.push(...parsed.notes);
             sources.push({ kind, url, sha256: createHash('sha256').update(text).digest('hex'), records: parsed.total });
@@ -134,12 +137,14 @@ export async function buildScenario(c: Config, root: string, allowPartial = fals
         await save(result.entry.name, result.entry.text);
       }
     } catch (e) {
-      if (!allowPartial || bytes > MAX_BYTES) throw Error(`${kind}: ${describeError(e)}`);
+      if (bytes > MAX_BYTES) throw e;
+      console.log(`Unavailable ${kind}: ${describeError(e)}`);
       missing.push(`${kind}: ${describeError(e)}`);
       const names = kind === 'lightning' ? ['merlin_cg', 'merlin_cc_density'] : [kind];
       for (const name of names) await rm(join(root, 'placefiles', `${name}.txt`), { force: true });
     }
   }
+  if (missing.length && !allowPartial) throw Error('Selected layers unavailable: ' + missing.join('; ') + '. Enable Allow partial only if you want the remaining data.');
   if (c.layers.includes('winds') && !missing.some(s => s.startsWith('winds:'))) {
     const icon = Buffer.from(sprite, 'base64'); charge(icon.length);
     await writeFile(join(root, 'placefiles/wind_barb.png'), icon);

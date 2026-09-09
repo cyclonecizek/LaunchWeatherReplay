@@ -99,7 +99,7 @@ jobs:
           SCENARIO_MERLIN: ${{ github.event_name == 'push' || inputs.merlin }}
           SCENARIO_WIND_HEIGHT: ${{ inputs.wind_height }}
           SCENARIO_TRAIL: ${{ inputs.trail }}
-          SCENARIO_ALLOW_PARTIAL: ${{ inputs.allow_partial }}
+          SCENARIO_ALLOW_PARTIAL: ${{ github.event_name == 'push' || inputs.allow_partial }}
         run: npm run scenario
       - name: Upload the completed ZIP
         id: upload

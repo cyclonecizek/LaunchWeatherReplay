@@ -8,7 +8,7 @@ Profilers are deferred.
 ## Start here: test the office download
 
 1. Sign into GitHub and open [Build GR scenario](https://github.com/cyclonecizek/LaunchWeatherReplay/actions/workflows/build-scenario.yml).
-2. Open the latest successful run and download `GitHub-download-test.zip` under **Artifacts**. The initial setup also attempts the June 25, 2024, 21:00–21:30 UTC weather scenario in a separate job.
+2. Open the latest successful run and download `GitHub-download-test.zip` under **Artifacts**. The initial setup also attempts the June 25, 2024, 21:00–21:30 UTC weather scenario in a separate job, allowing a clearly labeled partial package if KSC observations are unavailable.
 3. Extract the test ZIP once and open `README.txt`. This tests a real GitHub artifact download, not just access to github.com. It contains no weather data.
 4. If the download is blocked, give IT the exact blocked URL. No Cloudflare URL is used by this workflow.
 
