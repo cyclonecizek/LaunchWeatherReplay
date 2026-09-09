@@ -83,6 +83,10 @@ jobs:
         run: npm ci --no-audit --no-fund
       - name: Check time handling and archive integrity
         run: npm run test:scenario
+      - name: Inspect KSC certificate chain
+        if: matrix.mode == 'Weather scenario'
+        run: |
+          timeout 20 openssl s_client -connect kscweather.ksc.nasa.gov:443 -servername kscweather.ksc.nasa.gov -showcerts </dev/null 2>/dev/null | openssl x509 -noout -subject -issuer -ext authorityInfoAccess
       - name: Retrieve data and validate ZIP
         id: scenario
         env:
