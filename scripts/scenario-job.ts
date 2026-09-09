@@ -14,6 +14,11 @@ import sprite from '../lib/barb-data.json';
 
 const MAX_BYTES = 2_000_000_000;
 const MIN = 60_000;
+function describeError(error: unknown): string {
+  if (!(error instanceof Error)) return String(error);
+  const cause = error.cause as { code?: string; message?: string } | undefined;
+  return error.message + (cause ? ` (${cause.code || 'cause'}: ${cause.message || String(cause)})` : '');
+}
 const bool = (s: string | undefined, fallback: boolean) => s === undefined ? fallback : s === 'true';
 export function configFromEnv(env: Record<string, string | undefined>): Config {
   const normalize = (s: string) => s.trim().replace(' ', 'T').replace(/Z?$/, 'Z');
@@ -129,8 +134,8 @@ export async function buildScenario(c: Config, root: string, allowPartial = fals
         await save(result.entry.name, result.entry.text);
       }
     } catch (e) {
-      if (!allowPartial || bytes > MAX_BYTES) throw Error(`${kind}: ${e instanceof Error ? e.message : String(e)}`);
-      missing.push(`${kind}: ${e instanceof Error ? e.message : String(e)}`);
+      if (!allowPartial || bytes > MAX_BYTES) throw Error(`${kind}: ${describeError(e)}`);
+      missing.push(`${kind}: ${describeError(e)}`);
       const names = kind === 'lightning' ? ['merlin_cg', 'merlin_cc_density'] : [kind];
       for (const name of names) await rm(join(root, 'placefiles', `${name}.txt`), { force: true });
     }
@@ -176,5 +181,5 @@ export async function run(env: Record<string, string | undefined> = process.env)
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
-  run().catch(e => { console.error(e instanceof Error ? e.message : e); process.exitCode = 1; });
+  run().catch(e => { console.error(describeError(e)); process.exitCode = 1; });
 }

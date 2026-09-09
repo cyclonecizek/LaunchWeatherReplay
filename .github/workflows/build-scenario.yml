@@ -69,6 +69,8 @@ jobs:
         mode: ${{ github.event_name == 'push' && (contains(github.event.head_commit.message, '[trial-scenario]') && fromJSON('["Network test","Weather scenario"]') || fromJSON('["Network test"]')) || fromJSON(format('["{0}"]', inputs.mode)) }}
     runs-on: ubuntu-latest
     timeout-minutes: 120
+    env:
+      NODE_USE_SYSTEM_CA: '1'
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
