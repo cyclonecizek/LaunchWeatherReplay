@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Build and download archived radar and KSC placefiles for GR2Analyst replay.">
+  <title>Launch Weather Replay</title>
+  <style>
+    :root{color-scheme:dark;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#09141f;color:#e8f1f8;line-height:1.6}
+    *{box-sizing:border-box}body{margin:0}main{max-width:1080px;margin:auto;padding:28px 24px 64px}
+    a{color:#89dafa;text-underline-offset:4px}a:focus-visible{outline:3px solid #f1cd76;outline-offset:5px}header{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;border-bottom:1px solid #2d4458;padding-bottom:20px}
+    .brand{letter-spacing:.1em;font-size:.9rem;color:#99e1ff}header a{font-size:.9rem}h1{font-size:clamp(2rem,5vw,3.3rem);line-height:1.15;font-weight:550;margin:30px 0 12px;letter-spacing:-.035em}h2{font-size:1.45rem;font-weight:550;margin:0 0 12px}h3{font-size:1.15rem;font-weight:550;margin:0 0 8px}.intro{color:#aec2d3;max-width:660px;margin:0 0 24px;font-size:1.1rem}
+    .start{display:grid;grid-template-columns:1.4fr 1fr;gap:28px;background:#112231;border:1px solid #304b60;border-radius:12px;padding:26px;margin:24px 0 34px}.start p{margin:0 0 18px}.button{display:inline-block;background:#92dfff;color:#081722;text-decoration:none;border-radius:7px;padding:12px 20px;font-weight:650;min-height:48px}.secondary{background:transparent;border:1px solid #4b718a;color:#b5e8fc}.steps{margin:0;padding-left:22px;color:#bdccda}.steps li+li{margin-top:8px}.note{color:#adc0d0;font-size:.92rem}.hint{border-left:3px solid #d4b56f;padding:10px 16px;color:#d9cda9;background:#1b252d}.section-heading{display:flex;justify-content:space-between;align-items:baseline;gap:16px;flex-wrap:wrap;margin:30px 0 8px}.section-heading h2{margin:0}.section-heading a{font-size:.9rem}
+    .cards{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr))}.card{border:1px solid #304858;background:#10202e;border-radius:10px;padding:22px;min-width:0}.card p{margin:8px 0}.card .button{margin-top:12px}.badge{font-size:.82rem;color:#9bdaec;letter-spacing:.03em;text-transform:uppercase}.partial{color:#ebc774}.filename{overflow-wrap:anywhere;color:#afc3d3;font-size:.875rem}.expired .button{display:none}.expiry{color:#aabecf;font-size:.875rem}.expired .expiry{color:#ebc774}details{border-top:1px solid #304858;margin-top:32px;padding-top:20px}summary{cursor:pointer;font-size:1.08rem}footer{margin-top:34px;padding-top:18px;border-top:1px solid #304858;font-size:.875rem;color:#a7bacb}code{font-size:.95em}p{max-width:80ch}@media(max-width:660px){main{padding:20px 18px 40px}.start{grid-template-columns:1fr;padding:20px;gap:20px}.button{width:100%;text-align:center}}
+  </style>
+</head>
+<body>
+<main>
+  <header><span class="brand">LAUNCH WEATHER / REPLAY</span><a href="{{REPO_URL}}">View repository</a></header>
+  <h1>Build a weather replay.</h1>
+  <p class="intro">Archived Level II radar and KSC observations, prepared for one UTC timeline in GR2Analyst.</p>
+  <section class="start" aria-labelledby="build-heading">
+    <div><h2 id="build-heading">Choose your scenario</h2><p>Open the build form on GitHub to choose the UTC window, radar site, wind towers, field mills, and MERLIN lightning trail.</p><a class="button" href="{{WORKFLOW_URL}}">Open scenario build form</a><p class="note" style="margin-top:12px">Sign in to GitHub, then select <strong>Run workflow</strong>.</p></div>
+    <ol class="steps"><li>Enter start and end in 24-hour UTC, such as <code>2024-06-25T21:00</code>.</li><li>Choose your layers and run the build.</li><li>Wait for the finished ZIP, then download and extract it once.</li></ol>
+  </section>
+  <p class="hint">Downloads include radar, placefiles, needed icons, and GR instructions. Raw CSVs and profilers are excluded. A partial package identifies missing sources in its README.</p>
+  <div class="section-heading"><h2>Ready to download</h2><a href="{{WORKFLOW_URL}}">View all builds</a></div>
+  <p class="note">Sign into GitHub to download. Packages expire after seven days, so save the ones you need locally. This list updates after each scenario build.</p>
+  <section class="cards" aria-label="Completed scenario downloads">{{SCENARIOS}}</section>
+  <div class="section-heading"><h2>Check office access</h2></div>
+  <p class="note">Try the small test ZIP before requesting a larger replay. Opening this page alone does not test your network’s download rules.</p>
+  <section class="cards" aria-label="Network download test">{{NETWORK_TEST}}</section>
+  <details><summary>Loading a scenario in GR2Analyst</summary><ol class="steps"><li>Extract the complete ZIP to a permanent folder and read <code>README.txt</code>.</li><li>When wind icons are included, run <code>FIX_ICON_PATHS.cmd</code> or follow the manual icon-path instructions.</li><li>Stop live polling and open the files in the radar folder.</li><li>Add <code>replay_clock_check.txt</code> in Placefile Manager. Verify that its time changes as you step through radar.</li><li>Add the other placefiles and start the loop.</li></ol><p class="note">Playback still needs verification in your installed GR2Analyst 3.0, 3.2, or 3.4. ZIP validation confirms file integrity, not GR compatibility. Display colors are not launch criteria.</p></details>
+  <footer>Catalog updated {{UPDATED}} UTC. <a href="https://kscweather.ksc.nasa.gov/wxarchive/">KSC archive</a> · <a href="https://registry.opendata.aws/noaa-nexrad/">NEXRAD archive</a></footer>
+</main>
+<script>
+  // Expired artifacts must not appear downloadable between catalog rebuilds.
+  for (const card of document.querySelectorAll('[data-expires]')) {
+    if (Date.parse(card.dataset.expires) <= Date.now()) {
+      card.classList.add('expired');
+      card.querySelector('.expiry').textContent = 'Expired. Open the build form to create this scenario again.';
+    }
+  }
+</script>
+</body>
+</html>

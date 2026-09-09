@@ -57,8 +57,28 @@ Pushes affecting the generator run tests and create the small network-test ZIP.
 Including `[trial-scenario]` in the commit message also attempts the default real
 weather case. Manual runs use the selected form settings.
 
-GitHub Actions is the current GitHub-hosted interface. A separate GitHub Pages
-catalog is not required for these downloads. The existing Cloudflare page remains
+## GitHub Pages website
+
+The Pages site is a static entry point with an Actions build-form link, completed
+scenario downloads, office test ZIPs, and GR loading instructions. It does not
+send requests to Cloudflare or expose a GitHub token in the browser.
+
+One-time activation:
+
+1. Open repository **Settings > Pages**.
+2. Under **Build and deployment**, set **Source** to **GitHub Actions**.
+3. Open **Actions > Publish GitHub Pages > Run workflow**, use `main`, and run it.
+4. Visit https://cyclonecizek.github.io/LaunchWeatherReplay/ after deployment succeeds.
+
+The catalog then refreshes after each **Build GR scenario** run and when its page
+source changes. Expired downloads are disabled. Only HTML is published on Pages;
+ZIPs remain GitHub Actions artifacts and require a GitHub login to download.
+
+The Pages workflow can build the site before activation, but deployment will fail
+until a repository administrator enables Pages. This is an account setting, not
+a source-code change.
+
+ The existing Cloudflare page remains
 available, links to this workflow, and also omits raw CSVs from its TAR downloads;
 its request-size and runtime limits still apply.
 
