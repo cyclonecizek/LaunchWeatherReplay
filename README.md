@@ -1,24 +1,70 @@
 # Launch Weather Replay
 
-Scenario builder for GR2Analyst. Select an archived UTC time range, NEXRAD site,
-and KSC observation layers, check source coverage, then download a streaming TAR
-with original radar volumes, synchronized placefiles, raw observations, and a
-coverage manifest.
+Build a complete GR2Analyst replay ZIP on GitHub: archived Level II radar plus
+synchronized wind towers, field mills, MERLIN CG, and grouped CC placefiles.
+Raw CSVs are used temporarily during generation and are **not downloaded**.
+Profilers are deferred.
 
-## Current scope and limitations
+## Start here: test the office download
 
-- NEXRAD inventory/download: Unidata's `unidata-nexrad-level2` archive, paginated by UTC day; MDM files excluded. Maximum 12 hours / 2 GB radar per bundle.
-- KSC tower retrieval: four export groups from Brian Cizek's WINDS_Placefile implementation, split into one-hour chunks. The archive year token supports 2000 through 2059; actual sensor availability is checked for the selected period.
-- Field mills: automatic retrieval of signed one-minute means using the same 2000–2059 archive year encoding. Manual CSV import is also supported.
-- MERLIN: automatic Cloud-to-Ground and Cloud-to-Cloud retrieval in five-minute intervals, including the selected lookback before the replay begins. Checked source data is reused during TAR assembly to avoid repeated Worker subrequests. CG detections remain individual markers. CC detections are grouped into approximately 1 km density cells refreshed once per minute.
-- Wind profilers are intentionally deferred.
-- TimeRange v1.5 generation is implemented, but GR2Analyst native playback has NOT been tested. A clock-check placefile is included for the user's installed GR build.
-- Only NEXRAD sites with matching public archive keys are retrieved. Cape non-NEXRAD WSR is not connected.
-- No scenario database or upload persistence. Download requests carry observation text to the server for TAR packaging.
+1. Sign into GitHub and open [Build GR scenario](https://github.com/cyclonecizek/LaunchWeatherReplay/actions/workflows/build-scenario.yml).
+2. Open the latest successful run and download `GitHub-download-test.zip` under **Artifacts**. The initial setup also attempts the June 25, 2024, 21:00–21:30 UTC weather scenario in a separate job.
+3. Extract the test ZIP once and open `README.txt`. This tests a real GitHub artifact download, not just access to github.com. It contains no weather data.
+4. If the download is blocked, give IT the exact blocked URL. No Cloudflare URL is used by this workflow.
+
+## Build your scenario
+
+1. On the same workflow page, click **Run workflow** and use branch `main`.
+2. Select **Weather scenario**. Enter start and end as `YYYY-MM-DDTHH:MM`, in 24-hour UTC. End must be later than start, including the next date if crossing midnight.
+3. Choose the radar site, observation layers, wind height, and lightning trail (up to 60 minutes).
+4. Leave **Allow partial** unchecked to stop if a selected KSC layer fails. If deliberately enabled, the ZIP is named `PARTIAL` and the missing layers are identified inside.
+5. Click **Run workflow**, wait for the green check, then download the ZIP under **Artifacts**. Extract once, follow `README.txt`, and verify the clock-check placefile in GR before adding the weather layers.
+
+You need repository write access to start a workflow and a GitHub login with read
+access to download its artifacts. Files expire after seven days; save them locally.
+The ZIP is uploaded directly, with no extra ZIP wrapped around it.
+
+## Package contents
+
+- `radar/<site>/`: unchanged archived Level II volumes.
+- `placefiles/`: selected weather layers and the replay clock check.
+- `placefiles/wind_barb.png` and `FIX_ICON_PATHS.cmd`: included when towers are available. Instructions also explain manually setting the icon path if scripts cannot run.
+- `README.txt`: GR setup and missing-source notes.
+- `manifest.json`: small coverage/provenance record, including source hashes; no raw CSVs.
+
+GitHub retrieves sources and writes files to temporary disk. A standard ZIP writer
+finishes the archive, reopens it, checks every file CRC and the complete file list,
+and only then makes it available. Failed required transfers publish no new ZIP.
+The job has a 2 GB total uncompressed package limit and a 12-hour scenario limit;
+there is no separate 20 MB observation limit and no 45-radar-volume cap.
+
+Automatic source requests still depend on NASA/S3 availability. KSC export tokens
+were verified against supplied 2024/2026 examples; other encoded years (2000–2059)
+remain inferred, not independently verified archive coverage. Missing data is
+reported rather than invented. The workflow does not bypass TLS checks or use
+browser session cookies.
+
+## Development
+
+- `npm ci`
+- `npm run test:scenario` checks parsing, UTC boundaries, the disk-based generator,
+  interrupted transfers, missing layers, and completed ZIP contents with fixture data.
+- `npm run scenario` builds the default 2024-06-25 21:00–21:30 UTC case. Override
+  inputs with the `SCENARIO_*` environment variables in the workflow.
+- `SCENARIO_MODE='Network test' npm run scenario` builds the small access-test ZIP.
+
+Pushes affecting the generator run tests and create the small network-test ZIP.
+Including `[trial-scenario]` in the commit message also attempts the default real
+weather case. Manual runs use the selected form settings.
+
+GitHub Actions is the current GitHub-hosted interface. A separate GitHub Pages
+catalog is not required for these downloads. The existing Cloudflare page remains
+available, links to this workflow, and also omits raw CSVs from its TAR downloads;
+its request-size and runtime limits still apply.
 
 ## Time semantics
 
-All times are UTC, with an exclusive scenario end. Tower, mill, and profiler observations expire at the earlier of the next selected observation or age limits of 7, 2, and 10 minutes. Lightning detections begin no earlier than their observation time (subsecond starts round up) and expire after the selected trailing window. No future observations, interpolation, or infinite carry-forward. Raw timestamps and source units are retained. No claim is made about observation publication latency at the historical time.
+All times are UTC, with an exclusive scenario end. Tower and mill observations expire at the earlier of the next selected observation or age limits of 7 and 2 minutes. Lightning detections begin no earlier than their observation time (subsecond starts round up) and expire after the selected trailing window. No future observations, interpolation, or infinite carry-forward. Source timestamps and units are used in the placefiles; raw CSVs are not included. No claim is made about observation publication latency at the historical time.
 
 Field-mill display colors are visualization categories, not launch criteria. Wind
 barbs reuse the existing 0-60 kt sprite. MERLIN counts are detection records, not

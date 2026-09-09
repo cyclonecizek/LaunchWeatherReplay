@@ -12,7 +12,9 @@
     "start": "WRANGLER_LOG_PATH=.wrangler/wrangler.log vinext start",
     "test": "npm run build && node --import tsx --test tests/*.test.ts",
     "lint": "bash scripts/sites-env.sh -- eslint . --ignore-pattern dist --ignore-pattern .next",
-    "db:generate": "bash scripts/sites-env.sh -- drizzle-kit generate"
+    "db:generate": "bash scripts/sites-env.sh -- drizzle-kit generate",
+    "scenario": "node --import tsx scripts/scenario-job.ts",
+    "test:scenario": "node --import tsx --test tests/*.test.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",
@@ -57,7 +59,8 @@
     "typescript": "5.9.3",
     "vinext": "0.0.50",
     "vite": "8.0.13",
-    "wrangler": "4.92.0"
+    "wrangler": "4.92.0",
+    "tsx": "4.22.1"
   },
   "type": "module"
 }

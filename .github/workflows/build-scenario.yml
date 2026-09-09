@@ -1,0 +1,109 @@
+name: Build GR scenario
+run-name: "${{ github.event_name == 'push' && 'Office download test' || inputs.mode }}"
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/build-scenario.yml'
+      - 'scripts/scenario-job.ts'
+      - 'scripts/package-scenario.py'
+      - 'tests/scenario-job.test.ts'
+      - 'lib/merlin.ts'
+      - 'lib/replay.ts'
+      - 'lib/archive.ts'
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'Start with Network test at the office; then build Weather scenario'
+        type: choice
+        options: ['Weather scenario', 'Network test']
+        default: 'Weather scenario'
+      start:
+        description: 'Start UTC, 24-hour: YYYY-MM-DDTHH:MM'
+        required: true
+        default: '2024-06-25T21:00'
+      end:
+        description: 'End UTC, after start (maximum 12 hours)'
+        required: true
+        default: '2024-06-25T21:30'
+      radar:
+        description: 'Four-character NEXRAD site'
+        required: true
+        default: 'KMLB'
+      winds:
+        description: 'Include wind towers'
+        type: boolean
+        default: true
+      fieldmills:
+        description: 'Include field mills'
+        type: boolean
+        default: true
+      merlin:
+        description: 'Include MERLIN CG and grouped CC'
+        type: boolean
+        default: true
+      wind_height:
+        description: 'Wind height (feet); surface is <=20, 200plus is lowest >=200'
+        type: choice
+        options: ['54', 'surface', 'lowest', '200plus']
+        default: '54'
+      trail:
+        description: 'Lightning trail in minutes'
+        type: choice
+        options: ['1', '5', '10', '15', '30', '45', '60']
+        default: '60'
+      allow_partial:
+        description: 'Allow a clearly labeled partial package if a KSC layer fails'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: ${{ matrix.mode }}
+    strategy:
+      fail-fast: false
+      matrix:
+        mode: ${{ github.event_name == 'push' && (contains(github.event.head_commit.message, '[trial-scenario]') && fromJSON('["Network test","Weather scenario"]') || fromJSON('["Network test"]')) || fromJSON(format('["{0}"]', inputs.mode)) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Check time handling and archive integrity
+        run: npm run test:scenario
+      - name: Retrieve data and validate ZIP
+        id: scenario
+        env:
+          SCENARIO_MODE: ${{ matrix.mode }}
+          SCENARIO_START: ${{ inputs.start }}
+          SCENARIO_END: ${{ inputs.end }}
+          SCENARIO_RADAR: ${{ inputs.radar }}
+          SCENARIO_WINDS: ${{ github.event_name == 'push' || inputs.winds }}
+          SCENARIO_FIELDMILLS: ${{ github.event_name == 'push' || inputs.fieldmills }}
+          SCENARIO_MERLIN: ${{ github.event_name == 'push' || inputs.merlin }}
+          SCENARIO_WIND_HEIGHT: ${{ inputs.wind_height }}
+          SCENARIO_TRAIL: ${{ inputs.trail }}
+          SCENARIO_ALLOW_PARTIAL: ${{ inputs.allow_partial }}
+        run: npm run scenario
+      - name: Upload the completed ZIP
+        id: upload
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          path: ${{ steps.scenario.outputs.archive }}
+          archive: false
+          if-no-files-found: error
+          retention-days: 7
+      - name: Add download link
+        env:
+          DOWNLOAD_URL: ${{ steps.upload.outputs.artifact-url }}
+        run: printf '\n[Download the validated ZIP](%s)\n' "$DOWNLOAD_URL" >> "$GITHUB_STEP_SUMMARY"

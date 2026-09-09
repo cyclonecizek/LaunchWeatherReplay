@@ -14,6 +14,7 @@ const w=new DensityWindow();w.add(parsed.events);assert.equal(w.counts(Date.pars
 const original=globalThis.fetch;globalThis.fetch=async()=>new Response(body);
 try{
  const chunks:MerlinChunk[]=[];for(const r of merlinRequests(c)){const fetched=await fetchMerlin(r);chunks.push({source:fetched.source,text:fetched.text});}
+ assert(merlinEntries(c,chunks,false).every(e=>e.name.startsWith('placefiles/')));
  const entries=merlinEntries(c,chunks),cg=entries.find(x=>x.name==='placefiles/merlin_cg.txt')!.text;assert(cg.includes('TimeRange: 2024-06-25T21:00:01 2024-06-25T21:01:00'));assert(!cg.includes('21:02:01'));
  const cc=entries.find(x=>x.name==='placefiles/merlin_cc_density.txt')!.text;assert.equal((cc.match(/1 detection records in 1 occupied cells/g)||[]).length,2);
  globalThis.fetch=async()=>new Response(body+'\n');await assert.rejects(()=>fetchMerlin(chunks[0].source),/changed/);

@@ -39,14 +39,29 @@ export class DensityWindow{
  add(events:Detection[]){for(const e of events){const minute=Math.floor(e.time/MIN)*MIN;let bin=this.minutes.get(minute);if(!bin){bin=new Map();this.minutes.set(minute,bin);}const key=cellKey(e.lat,e.lon);bin.set(key,(bin.get(key)||0)+1);}}
  counts(t:number,trail:number){const counts=new Map<string,number>();for(const [minute,bin] of this.minutes){if(minute<t-trail){this.minutes.delete(minute);continue;}if(minute>=t)continue;for(const [key,n] of bin)counts.set(key,(counts.get(key)||0)+n);}return counts;}
 }
-export const merlinRawName=(s:MerlinSource,i:number)=>`raw/merlin_${s.type.toLowerCase()}_${String(i+1).padStart(3,'0')}.csv`;
-export function merlinEntries(c:Config,chunks:MerlinChunk[]):Entry[]{
- const checked=checkedSources(c,chunks.map(x=>x.source)),{a,b}=validate(c),trail=c.lightningMinutes*MIN;
- const parsed=chunks.map((chunk,i)=>({source:checked[i],text:chunk.text,events:parseMerlin(chunk.text,Date.parse(checked[i].start),Date.parse(checked[i].end)).events}));
- let cg=`Title: MERLIN CG / trailing ${c.lightningMinutes} min\nThreshold: 999\nFont: 1, 13, 1, "Arial"\n`;
- for(const chunk of parsed.filter(x=>x.source.type==='CG'))for(const e of chunk.events){const start=Math.max(a,Math.floor(e.time/1000)*1000+(e.subsecond?1000:0)),end=Math.floor(Math.min(b,e.time+trail)/1000)*1000;if(end<=start)continue;const signalText=e.signal.replace(/[^0-9.+-]/g,'');cg+=`TimeRange: ${grtime(start)} ${grtime(end)}\nColor: 255 210 80\nText: ${e.lat}, ${e.lon}, 1, "+", "CG detection / ${new Date(e.time).toISOString()} / signal strength ${signalText} (source units)"\n`;}
- let cc=`Title: MERLIN CC density / approximately 1 km / trailing ${c.lightningMinutes} min\nThreshold: 999\nFont: 1, 12, 1, "Arial"\n; Counts are detection records, not flashes. Each minute T counts [T-trail,T).\n; Density colors: blue 1-4, cyan 5-19, green 20-49, yellow 50-99, orange 100-249, red 250+.\n`,window=new DensityWindow();
- for(const chunk of parsed.filter(x=>x.source.type==='CC'))window.add(chunk.events);
- for(let t=a;t<b;t+=MIN){const counts=window.counts(t,trail);cc+=`TimeRange: ${grtime(t)} ${grtime(Math.min(t+MIN,b))}\n`;let triangles='Triangles:\n',total=0;for(const [key,n] of counts){total+=n;const [i,j]=key.split(',').map(Number);for(const [x,y] of [[i,j],[i+1,j],[i+1,j+1],[i,j],[i+1,j+1],[i,j+1]])triangles+=`${(28.5+y/KM_LAT).toFixed(7)}, ${(-80.6+x/KM_LON).toFixed(7)}, ${color(n)}, 90\n`;}if(counts.size)cc+=triangles+'End:\n';cc+=`Color: 255 255 255\nText: 28.36, -80.46, 1, "CC density ${grtime(t).slice(11,16)}Z / ${c.lightningMinutes} min / 1 km", "${total} detection records in ${counts.size} occupied cells. End-exclusive window."\n`;}
- return [{name:'placefiles/merlin_cg.txt',text:cg},{name:'placefiles/merlin_cc_density.txt',text:cc},...parsed.map((x,i)=>({name:merlinRawName(x.source,i),text:x.text}))];
+export const merlinRawName=(s:Pick<MerlinSource,'type'>,i:number)=>`raw/merlin_${s.type.toLowerCase()}_${String(i+1).padStart(3,'0')}.csv`;
+export const cgHeader=(c:Config)=>`Title: MERLIN CG / trailing ${c.lightningMinutes} min\nThreshold: 999\nFont: 1, 13, 1, "Arial"\n`;
+export function* cgParts(c:Config,events:Detection[]){
+ const {a,b}=validate(c),trail=c.lightningMinutes*MIN;
+ for(const e of events){const start=Math.max(a,Math.floor(e.time/1000)*1000+(e.subsecond?1000:0)),end=Math.floor(Math.min(b,e.time+trail)/1000)*1000;if(end<=start)continue;const signalText=e.signal.replace(/[^0-9.+-]/g,'');yield `TimeRange: ${grtime(start)} ${grtime(end)}\nColor: 255 210 80\nText: ${e.lat}, ${e.lon}, 1, "+", "CG detection / ${new Date(e.time).toISOString()} / signal strength ${signalText} (source units)"\n`;}
+}
+export function* ccParts(c:Config,window:DensityWindow){
+ const {a,b}=validate(c),trail=c.lightningMinutes*MIN;
+ yield `Title: MERLIN CC density / approximately 1 km / trailing ${c.lightningMinutes} min\nThreshold: 999\nFont: 1, 12, 1, "Arial"\n; Counts are detection records, not flashes. Each minute T counts [T-trail,T).\n; Density colors: blue 1-4, cyan 5-19, green 20-49, yellow 50-99, orange 100-249, red 250+.\n`;
+ for(let t=a;t<b;t+=MIN){
+  const counts=window.counts(t,trail);yield `TimeRange: ${grtime(t)} ${grtime(Math.min(t+MIN,b))}\n`;let total=0;
+  if(counts.size)yield 'Triangles:\n';
+  for(const [key,n] of counts){total+=n;const [i,j]=key.split(',').map(Number);let cell='';for(const [x,y] of [[i,j],[i+1,j],[i+1,j+1],[i,j],[i+1,j+1],[i,j+1]])cell+=`${(28.5+y/KM_LAT).toFixed(7)}, ${(-80.6+x/KM_LON).toFixed(7)}, ${color(n)}, 90\n`;yield cell;}
+  if(counts.size)yield 'End:\n';
+  yield `Color: 255 255 255\nText: 28.36, -80.46, 1, "CC density ${grtime(t).slice(11,16)}Z / ${c.lightningMinutes} min / 1 km", "${total} detection records in ${counts.size} occupied cells. End-exclusive window."\n`;
+ }
+}
+export function merlinEntries(c:Config,chunks:MerlinChunk[],includeRaw=true):Entry[]{
+ const checked=checkedSources(c,chunks.map(x=>x.source)),window=new DensityWindow();
+ let cg=cgHeader(c);
+ for(const [i,chunk] of chunks.entries()){
+  const s=checked[i],events=parseMerlin(chunk.text,Date.parse(s.start),Date.parse(s.end)).events;
+  if(s.type==='CG')cg+=Array.from(cgParts(c,events)).join('');else window.add(events);
+ }
+ return [{name:'placefiles/merlin_cg.txt',text:cg},{name:'placefiles/merlin_cc_density.txt',text:Array.from(ccParts(c,window)).join('')},...(includeRaw?chunks.map((x,i)=>({name:merlinRawName(x.source,i),text:x.text})):[])];
 }

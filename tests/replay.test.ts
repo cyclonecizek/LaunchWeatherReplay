@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { writeFile } from 'node:fs/promises';
+
 import { parse,generate,utc,probe,type Config,type Observation } from '../lib/replay';
 import { kscURL,radarFiles,baseConfig,keyTime } from '../lib/archive';
 import { tarStream } from '../lib/tar';
@@ -27,5 +27,5 @@ assert.equal(generate('profilers',[{...base,height:1600}],c).report.plotted,0);
 assert(Number.isNaN(keyTime('2026/08/10/KMLB/KMLB20260810_180000_V06_MDM')));
 assert.equal(keyTime('2026/08/10/KMLB/KMLB20260810_180000_V06'),Date.parse(c.start));
 const sample=new TextEncoder().encode('UTC replay integrity\n'),t=tarStream([{name:'sample.txt',size:sample.length,data:async()=>sample},{name:'nested/bytes.bin',size:6,data:async()=>new ReadableStream({start(x){x.enqueue(new Uint8Array([0,1,2]));x.enqueue(new Uint8Array([3,254,255]));x.close();}})}]);
-await writeFile('/workspace/scratch/8d6467223bc0/research/tar-test.tar',new Uint8Array(await new Response(t).arrayBuffer()));
+const tarBytes=new Uint8Array(await new Response(t).arrayBuffer());assert.equal(tarBytes.length%512,0);assert(tarBytes.slice(-1024).every(v=>v===0));
 console.log('PASS: UTC dates, token compatibility, source schemas, signed values, duplicate rows, sensor side, height selection, gap expiry, future exclusion, fractional lightning time, radar keys, TAR stream.');

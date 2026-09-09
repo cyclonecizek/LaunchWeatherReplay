@@ -96,7 +96,7 @@ export default function Home(){
    }
    if(controller.signal.aborted)throw new DOMException('Cancelled','AbortError');
    result.entries.push(probe(result.radar,c));
-   if(result.entries.reduce((n,e)=>n+e.text.length,0)>20e6)throw Error('Observation files exceed 20 MB. Choose a shorter window.');
+   if(result.entries.filter(e=>e.name.startsWith('placefiles/')).reduce((n,e)=>n+e.text.length,0)>20e6)throw Error('Observation files exceed 20 MB. Choose a shorter window.');
    setPrepared(result);setErrors(issues);setStatus(result.missing.length?'Coverage checked. Some selected sources are missing or incomplete.':'Selected sources prepared. Review coverage before downloading.');setProgress(100);
   }catch(e){setErrors([controller.signal.aborted?'Preparation cancelled.':e instanceof Error?e.message:'Unable to prepare scenario.']);setStatus('');}
   finally{setBusy(false);abort.current=null;}
@@ -109,6 +109,7 @@ export default function Home(){
  return <main className="workspace">
   <header><div className="brand"><Radar size={25}/><span>LAUNCH WEATHER / REPLAY</span></div><span className="tag">GR2Analyst · archive mode</span></header>
   <div className="title-row"><p className="eyebrow">SCENARIO BUILDER</p><h1>Bring the countdown back.</h1><p className="intro">Archived radar and local observations, on one UTC timeline.</p></div>
+  <p className="notice">For a complete ZIP built on GitHub, <a href="https://github.com/cyclonecizek/LaunchWeatherReplay/actions/workflows/build-scenario.yml" style={{textDecoration:'underline'}}>open the GitHub scenario builder</a>. Sign in, choose Run workflow, and enter the UTC window. Raw CSVs are excluded.</p>
   <div className="work-grid"><div className="stack"><fieldset disabled={busy} className="panel" style={{minWidth:0}}>
    <h2><span className="step">01</span> Define the scenario</h2>
    <label>Scenario name<Input maxLength={100} value={name} onChange={e=>update(()=>setName(e.target.value))}/></label>
@@ -142,9 +143,9 @@ export default function Home(){
    <Button className="action" disabled={prepared.missing.length>0&&!partial} onClick={download}><Download size={18}/>{prepared.missing.length?'Download partial scenario':'Download scenario TAR'}</Button>
    {submitted&&<p className="note" role="status">Download requested in a new tab. The checked MERLIN data is reused while radar files stream into the TAR archive. After it finishes, extract it and confirm manifest.json is present. If a source error appears, refresh coverage and retry.</p>}
    </>}
-   {!prepared&&<div className="summary"><div className="zip-list"><FileArchive size={24}/><div><p style={{margin:0,color:'#e0eef9'}}>One folder for the replay</p><p className="note">Radar volumes, time-windowed placefiles, raw observations, and a coverage manifest.</p></div></div><ul className="files"><li><span>radar/</span> original Level II files</li><li><span>placefiles/</span> selected layers + clock check</li><li><span>raw/</span> source observations</li><li><span>manifest.json</span> time rules & missing data</li><li><span>README.txt</span> GR loading instructions</li></ul></div>}
+   {!prepared&&<div className="summary"><div className="zip-list"><FileArchive size={24}/><div><p style={{margin:0,color:'#e0eef9'}}>One folder for the replay</p><p className="note">Radar volumes, time-windowed placefiles, icons, and a coverage manifest.</p></div></div><ul className="files"><li><span>radar/</span> original Level II files</li><li><span>placefiles/</span> selected layers + clock check</li><li><span>manifest.json</span> time rules & missing data</li><li><span>README.txt</span> GR loading instructions</li></ul></div>}
   </section><section className="panel"><h2><Clock3 size={19} color="#88d8f5"/> One replay clock</h2><p>Each observation receives a UTC validity window. The intended behavior is for GR to select the appropriate observations as you play, pause, or step through archived radar.</p><p className="note">Towers expire after 7 minutes, mills after 2, or sooner when replaced. Lightning uses your selected trail. Future observations are excluded, and gaps remain visible.</p><div className="notice">Start with replay_clock_check.txt in GR. It is included to verify time matching on your installed version before relying on synchronized playback.</div><p className="note">After downloading: extract the TAR archive, run FIX_ICON_PATHS.cmd once, open the radar files, and add the local placefiles in GR’s Placefile Manager.</p></section></div>
   </div>
-  <footer className="footer">Sources: <a href="https://registry.opendata.aws/noaa-nexrad/" target="_blank" rel="noreferrer">Unidata NEXRAD archive</a> · <a href="https://kscweather.ksc.nasa.gov/wxarchive/" target="_blank" rel="noreferrer">KSC Spaceport Weather Archive</a><br/>Station locations and wind icons reuse your existing placefile assets. Imported files are processed in this page and included in the requested download; scenarios are not saved as a server-side catalog.</footer>
+  <footer className="footer">Sources: <a href="https://registry.opendata.aws/noaa-nexrad/" target="_blank" rel="noreferrer">Unidata NEXRAD archive</a> · <a href="https://kscweather.ksc.nasa.gov/wxarchive/" target="_blank" rel="noreferrer">KSC Spaceport Weather Archive</a><br/>Station locations and wind icons reuse your existing placefile assets. Raw CSVs are processed temporarily and omitted from the download; scenarios are not saved as a server-side catalog.</footer>
  </main>;
 }
