@@ -35,7 +35,8 @@ export function scenarioRequest(body) {
 export function runChild(job, directory, progress, signal) {
   return new Promise((resolveJob, reject) => {
     const temp = join(directory, 'work'); mkdirSync(temp, { recursive: true });
-    const child = spawn(process.execPath, ['--max-old-space-size=1400', '--import', 'tsx', 'scripts/scenario-job.ts'], {
+    // Leave room for the HTTP server, native buffers, and ZIP writer on 512 MB.
+    const child = spawn(process.execPath, ['--max-old-space-size=224', '--import', 'tsx', 'scripts/scenario-job.ts'], {
       cwd: PROJECT, detached: process.platform !== 'win32', stdio: ['ignore', 'pipe', 'pipe'],
       env: { PATH: process.env.PATH, NODE_EXTRA_CA_CERTS: process.env.NODE_EXTRA_CA_CERTS,
         NODE_USE_SYSTEM_CA: '1', ...job.env, TMPDIR: temp,

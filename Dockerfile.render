@@ -9,4 +9,4 @@ COPY server ./server
 RUN KSC_CERT_DIR=/app/ksc-certificates bash scripts/ksc-trust.sh && node scripts/prepare-render.mjs
 ENV NODE_ENV=production NODE_USE_SYSTEM_CA=1 NODE_EXTRA_CA_CERTS=/app/ksc-certificates/issuer.pem PORT=10000 REPLAY_DATA_DIR=/var/data/replay
 EXPOSE 10000
-CMD ["node", "--import", "tsx", "server/start.mjs"]
+CMD ["node", "--max-old-space-size=64", "--import", "tsx", "server/start.mjs"]

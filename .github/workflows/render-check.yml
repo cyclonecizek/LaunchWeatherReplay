@@ -9,7 +9,7 @@ permissions:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -24,7 +24,7 @@ jobs:
         run: docker build -f Dockerfile.render -t launch-replay .
       - name: Check the production HTTP server and complete ZIP
         run: |
-          docker run -d --name replay-check -p 10000:10000 -v replay-test:/var/data -e RENDER=true -e RENDER_EXTERNAL_URL=http://localhost:10000 launch-replay
+          docker run -d --name replay-check --memory=512000000 --memory-swap=512000000 --cpus=0.5 -p 10000:10000 -v replay-test:/var/data -e RENDER=true -e RENDER_EXTERNAL_URL=http://localhost:10000 launch-replay
           trap 'docker logs replay-check; docker rm -f replay-check' EXIT
           curl --fail --max-time 5 --retry 10 --retry-delay 1 --retry-all-errors http://localhost:10000/api/health
           curl --fail http://localhost:10000/ -o /tmp/replay.html
@@ -32,3 +32,10 @@ jobs:
           curl --fail http://localhost:10000/network-test.zip -o /tmp/replay-test.zip
           python3 -c "import zipfile; z=zipfile.ZipFile('/tmp/replay-test.zip'); assert z.testzip() is None; assert 'README.txt' in z.namelist()"
           docker exec replay-check node --import tsx --input-type=module -e "import { kscURL } from './lib/archive.ts'; const r = await fetch(kscURL('fieldmills', 0, '2024-06-25T21:00:00Z', '2024-06-25T21:01:00Z'), { signal: AbortSignal.timeout(60000) }); if (!r.ok || !(await r.text()).includes('OneMinuteMean')) throw Error('KSC probe failed'); console.log('KSC TLS and field-mill endpoint verified');"
+      - name: Trial two-hour weather replay within 512 MB
+        if: contains(github.event.head_commit.message, '[budget-trial]') || github.event_name == 'workflow_dispatch'
+        run: |
+          docker run -d --name replay-budget --memory=512000000 --memory-swap=512000000 --cpus=0.5 -p 10000:10000 -v replay-budget:/var/data -e RENDER=true -e RENDER_EXTERNAL_URL=http://localhost:10000 launch-replay
+          trap 'docker logs replay-budget; docker inspect --format "OOMKilled={{.State.OOMKilled}}" replay-budget; docker rm -f replay-budget' EXIT
+          curl --fail --max-time 5 --retry 10 --retry-delay 1 --retry-all-errors http://localhost:10000/api/health
+          python3 scripts/check-budget-replay.py
