@@ -2,7 +2,7 @@ services:
   - type: web
     name: launch-weather-replay
     runtime: docker
-    plan: 1c-2g
+    plan: 0.5c-512mb
     region: virginia
     branch: main
     dockerfilePath: ./Dockerfile.render
