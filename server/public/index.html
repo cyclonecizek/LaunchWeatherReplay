@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Launch Weather Replay</title>
+<meta name="description" content="Prepare archived radar and KSC placefiles for a GR2Analyst weather replay.">
+<link rel="icon" href="./favicon.svg" type="image/svg+xml"><link rel="stylesheet" href="./style.css">
+<script src="./config.js" defer></script><script src="./app.js" defer></script>
+</head>
+<body><main>
+<header><a class="brand" href="./">LAUNCH WEATHER / REPLAY</a><span>GR2Analyst · UTC</span></header>
+<h1>Build a weather replay.</h1><p class="intro">Archived Level II radar and KSC observations, together on one timeline. No account required.</p>
+<div class="workspace">
+<form id="scenario">
+<section class="panel"><h2><span class="number">01</span> Define the scenario</h2>
+<fieldset><legend>Start · UTC (24-hour)</legend><div class="datetime"><label>Date<input type="date" id="startDate" value="2024-06-25" min="1991-01-01" required></label><label>Hour<select id="startHour" aria-label="Start hour" required></select></label><span class="colon" aria-hidden="true">:</span><label>Minute<select id="startMinute" aria-label="Start minute" required></select></label></div></fieldset>
+<fieldset><legend>End · UTC (24-hour)</legend><div class="datetime"><label>Date<input type="date" id="endDate" value="2024-06-25" min="1991-01-01" required></label><label>Hour<select id="endHour" aria-label="End hour" required></select></label><span class="colon" aria-hidden="true">:</span><label>Minute<select id="endMinute" aria-label="End minute" required></select></label></div></fieldset>
+<p class="note" id="window-note">Choose 1 minute to 12 hours. Packages can contain up to 2 GB of GR files.</p>
+<label class="radar">Radar identifier<input id="radar" value="KMLB" maxlength="4" pattern="[A-Za-z][A-Za-z0-9]{3}" required autocapitalize="characters" spellcheck="false"></label><p class="note">KMLB is Melbourne NEXRAD. All dates and times are UTC.</p>
+<h2 class="second"><span class="number">02</span> Choose observations</h2>
+<label class="check"><input type="checkbox" id="winds" checked><span>Wind towers</span></label>
+<label class="setting">Tower height<select id="windHeight"><option value="54">54 feet</option><option value="surface">Surface (up to 20 feet)</option><option value="lowest">Lowest available</option><option value="200plus">Lowest at or above 200 feet</option></select></label>
+<label class="check"><input type="checkbox" id="fieldmills" checked><span>Field mills</span></label>
+<label class="check"><input type="checkbox" id="merlin" checked><span>MERLIN lightning · CG and grouped CC</span></label>
+<label class="setting">Lightning trail<select id="trail"><option value="1">1 minute</option><option value="5">5 minutes</option><option value="10">10 minutes</option><option value="15">15 minutes</option><option value="30">30 minutes</option><option value="45">45 minutes</option><option value="60" selected>60 minutes</option></select></label>
+<p class="note">CC detections are grouped into approximately 1 km cells and updated each minute. Archive coverage varies by date and source.</p>
+<label class="check partial"><input type="checkbox" id="allowPartial"><span>Allow a partial package if a selected source is unavailable</span></label><p class="note">Missing sources will be listed before download and in the ZIP. Leave this unchecked to require every selected source.</p>
+<p id="form-error" class="error" role="alert" hidden></p>
+<button id="build" type="submit">Build scenario ZIP</button>
+</section></form>
+<aside>
+<section class="panel status-panel" aria-labelledby="status-heading"><p class="eyebrow">YOUR SCENARIO</p><h2 id="status-heading">Ready when you are.</h2><div id="status" role="status" aria-live="polite"><p>Select a time window and observations to begin.</p></div><progress id="progress" aria-label="Scenario build in progress" hidden></progress><p id="job-window" class="note"></p><ul id="missing" class="missing" hidden></ul><a id="download" class="button" hidden>Download ZIP</a><p id="expiry" class="note"></p><button id="another" class="secondary" type="button" hidden>Build another scenario</button><p class="note">Keep this tab or save its address to return to your build. Downloads are temporary; the expiry time appears when yours is ready.</p></section>
+<section class="panel"><h2>Check office access</h2><p>Try a small ZIP from this server before building a larger scenario.</p><a id="network-test" href="./network-test.zip">Download test ZIP</a><p class="note">This checks the download domain your network will use. A successful page load alone does not check ZIP access.</p></section>
+</aside></div>
+<section class="instructions"><h2>From download to replay</h2><ol><li>Extract the complete ZIP to a permanent folder and read <code>README.txt</code>.</li><li>If wind icons are included, run <code>FIX_ICON_PATHS.cmd</code> or follow the manual path instructions.</li><li>Stop live polling in GR and open the files in the radar folder.</li><li>Add <code>replay_clock_check.txt</code> in Placefile Manager and check that its time follows the radar. Then add the remaining placefiles.</li></ol><p class="note">Packages contain radar, placefiles, required icons, and instructions. Raw CSVs and profilers are excluded. Playback requires verification in your installed GR2Analyst 3.0, 3.2, or 3.4.</p></section>
+<footer>Source availability does not establish complete sensor coverage. Display colors are not launch criteria. <a href="https://github.com/cyclonecizek/LaunchWeatherReplay">Project on GitHub</a></footer>
+</main></body></html>

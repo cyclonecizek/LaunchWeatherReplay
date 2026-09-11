@@ -14,7 +14,9 @@
     "lint": "bash scripts/sites-env.sh -- eslint . --ignore-pattern dist --ignore-pattern .next",
     "db:generate": "bash scripts/sites-env.sh -- drizzle-kit generate",
     "scenario": "node --import tsx scripts/scenario-job.ts",
-    "test:scenario": "node --import tsx --test tests/*.test.ts"
+    "test:scenario": "node --import tsx --test tests/*.test.ts",
+    "start:render": "node --import tsx server/start.mjs",
+    "prepare:render": "node scripts/prepare-render.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",

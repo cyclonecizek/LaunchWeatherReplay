@@ -1,0 +1,12 @@
+FROM node:24-bookworm-slim
+WORKDIR /app
+RUN apt-get update && apt-get install -y --no-install-recommends python3 curl openssl ca-certificates && rm -rf /var/lib/apt/lists/*
+COPY package.json package-lock.json ./
+RUN npm ci --include=dev --ignore-scripts && npm rebuild esbuild
+COPY lib ./lib
+COPY scripts/scenario-job.ts scripts/package-scenario.py scripts/ksc-trust.sh scripts/prepare-render.mjs ./scripts/
+COPY server ./server
+RUN KSC_CERT_DIR=/app/ksc-certificates bash scripts/ksc-trust.sh && node scripts/prepare-render.mjs
+ENV NODE_ENV=production NODE_USE_SYSTEM_CA=1 NODE_EXTRA_CA_CERTS=/app/ksc-certificates/issuer.pem PORT=10000 REPLAY_DATA_DIR=/var/data/replay
+EXPOSE 10000
+CMD ["node", "--import", "tsx", "server/start.mjs"]

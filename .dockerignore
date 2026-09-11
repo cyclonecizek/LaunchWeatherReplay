@@ -1,0 +1,14 @@
+*
+!package.json
+!package-lock.json
+!Dockerfile.render
+!lib/
+!lib/**
+!scripts/
+!scripts/scenario-job.ts
+!scripts/package-scenario.py
+!scripts/ksc-trust.sh
+!scripts/prepare-render.mjs
+!server/
+!server/**
+server/public/network-test.zip

@@ -6,9 +6,26 @@ import json
 import os
 from pathlib import Path
 import re
+import shutil
+import zipfile
+from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 
 ROOT = Path(__file__).resolve().parent.parent
+
+
+def render_public_builder(output, api_url):
+    parsed = urlparse(api_url)
+    if (parsed.scheme != 'https' or not parsed.hostname or parsed.username or parsed.password
+            or parsed.path not in ('', '/') or parsed.query or parsed.fragment):
+        raise ValueError('The replay API URL must be an HTTPS origin without a path or credentials.')
+    output.mkdir(parents=True, exist_ok=True)
+    for name in ('index.html', 'style.css', 'app.js', 'favicon.svg'):
+        shutil.copyfile(ROOT / 'server/public' / name, output / name)
+    (output / 'config.js').write_text('window.REPLAY_API_URL = ' + json.dumps(api_url.rstrip('/')) + ';\n')
+    # The UI links to the Render copy of this test ZIP, to test its download host.
+    with zipfile.ZipFile(output / 'network-test.zip', 'w', zipfile.ZIP_DEFLATED) as z:
+        z.writestr('README.txt', 'Launch Weather Replay network test. No weather data.\r\n')
 
 
 def fetch_artifacts(repository):
@@ -84,8 +101,12 @@ if __name__ == '__main__':
     repository = os.environ.get('GITHUB_REPOSITORY', 'cyclonecizek/LaunchWeatherReplay')
     if not re.fullmatch(r'[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+', repository):
         raise ValueError('Invalid repository name')
-    artifacts = json.loads(args.catalog.read_text()) if args.catalog else fetch_artifacts(repository)
     args.output.mkdir(parents=True, exist_ok=True)
-    (args.output / 'index.html').write_text(render(artifacts, repository))
+    api_url = json.loads((ROOT / 'pages/backend.json').read_text()).get('apiUrl', '')
+    if api_url:
+        render_public_builder(args.output, api_url)
+    else:
+        artifacts = json.loads(args.catalog.read_text()) if args.catalog else fetch_artifacts(repository)
+        (args.output / 'index.html').write_text(render(artifacts, repository))
     (args.output / '.nojekyll').write_text('')
-    print('GitHub Pages catalog built. Only static page assets are published.')
+    print('GitHub Pages built. Only static page assets are published.')

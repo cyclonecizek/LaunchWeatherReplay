@@ -179,6 +179,8 @@ export async function run(env: Record<string, string | undefined> = process.env)
     const destination = join(output, filename);
     execFileSync('python3', [fileURLToPath(new URL('./package-scenario.py', import.meta.url)), root, destination], { stdio: 'inherit' });
     const size = (await stat(destination)).size;
+    // The public server publishes a download only after packaging and CRC checks finish.
+    if (env.SCENARIO_RESULT_PATH) await writeFile(env.SCENARIO_RESULT_PATH, JSON.stringify({ filename, size, missing: result?.missing || [], radarVolumes: result?.radarVolumes || 0 }));
     if (env.GITHUB_OUTPUT) await appendFile(env.GITHUB_OUTPUT, `archive=${destination}\nfilename=${filename}\n`);
     if (env.GITHUB_STEP_SUMMARY) await appendFile(env.GITHUB_STEP_SUMMARY, `## ${networkTest ? 'Office download test' : 'GR scenario ready'}\n\nZIP built and every entry checked for CRC integrity. Download **${filename}** under Artifacts on this run. Extract once.\n\n${(size / 1e6).toFixed(2)} MB. ${result ? `${result.radarVolumes} radar volumes. Raw CSVs excluded. ${result.missing.length ? 'PARTIAL: check README.txt for missing sources.' : 'Selected archive requests completed.'}` : 'No weather data is included in this network test.'}\n`);
     return destination;

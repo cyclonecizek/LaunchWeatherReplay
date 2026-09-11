@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: launch-weather-replay
+    runtime: docker
+    plan: 1c-2g
+    region: virginia
+    branch: main
+    dockerfilePath: ./Dockerfile.render
+    healthCheckPath: /api/health
+    autoDeployTrigger: commit
+    disk:
+      name: replay-data
+      mountPath: /var/data
+      sizeGB: 10
+    envVars:
+      - key: REPLAY_ALLOWED_ORIGINS
+        value: https://cyclonecizek.github.io
+      - key: REPLAY_MAX_PENDING
+        value: "5"
+      - key: REPLAY_DAILY_LIMIT
+        value: "20"
+      - key: REPLAY_RETENTION_HOURS
+        value: "24"

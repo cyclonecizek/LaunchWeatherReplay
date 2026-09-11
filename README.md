@@ -1,5 +1,10 @@
 # Launch Weather Replay
 
+For the public website, where visitors build scenarios without a GitHub account,
+use the [Render deployment guide](RENDER.md). The repository now includes the
+public form, persistent job queue, verified ZIP downloads, and `render.yaml`.
+The GitHub Actions instructions below remain available as an alternate workflow.
+
 Build a complete GR2Analyst replay ZIP on GitHub: archived Level II radar plus
 synchronized wind towers, field mills, MERLIN CG, and grouped CC placefiles.
 Raw CSVs are used temporarily during generation and are **not downloaded**.
