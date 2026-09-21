@@ -8,10 +8,11 @@ const config:Config={name:'symbols',start:new Date(start).toISOString().replace(
 const reading=(minute:number,value:number,site='FM01'):Observation=>({time:start+minute*MIN,value,site,lat:site==='FM01'?28.5:28.6,lon:-80.6});
 function frames(obs:Observation[]){
  const text=generate('fieldmills',obs,config).entry.text;
- assert(!text.includes('Text:')); assert(text.includes('Polygon:'));
+ assert(!text.includes('Polygon:')); assert(text.includes('Font: 2, 12, 0, "Wingdings"'));
+ assert([...text.matchAll(/^Text:.*$/gm)].every(m=>/^Text: 0, 0, [23], "l"(?:, "|$)/.test(m[0])));
  return text.split('TimeRange: ').slice(1).map(part=>{
   const [a,b]=part.split('\n',1)[0].split(' ');
-  return {a:Date.parse(a+'Z'),b:Date.parse(b+'Z'),color:/Color: ([^\n]+)/.exec(part)![1],part};
+  return {a:Date.parse(a+'Z'),b:Date.parse(b+'Z'),color:[...part.matchAll(/Color: ([^\n]+)/g)].at(-1)![1],part};
  });
 }
 const RED='255 65 65',YELLOW='255 205 35',GREEN='55 230 100';
@@ -28,7 +29,7 @@ test('field circles use magnitude, include pre-start history, and split at exact
  assert.deepEqual(colorsAt(f,5),[YELLOW]);
  assert.deepEqual(colorsAt(f,7),[]); // Recovery never prolongs stale measurements.
  assert(f.some(x=>x.part.includes('1-min mean: -1000 V/m'))); // Signed values remain on hover.
- assert(f.every(x=>x.part.includes('Line: 1, 0, "FM01')));
+ assert(f.every(x=>x.part.includes('Text: 0, 0, 2, "l", "FM01')));
 });
 
 test('recovery is station-local, renewed by later exceedances, and excludes future readings',()=>{
@@ -51,11 +52,12 @@ test('CC uses one opaque, outlined dot per cell with density colors and no map t
  w.add([{time:start,lat:29,lon:-81,signal:'0'}]);
  const text=Array.from(ccParts({...config,end:new Date(start+MIN).toISOString().replace('.000Z','Z')},w)).join('');
  assert.equal((text.match(/^Object:/gm)||[]).length,6);
- assert.equal((text.match(/^Polygon:/gm)||[]).length,6);
- assert.equal((text.match(/^Line: 1, 0/gm)||[]).length,6);
- assert(!text.includes('Triangles:')); assert(!text.includes('Text:')); assert(!text.includes('CC density 21:'));
+ assert.equal((text.match(/^Text: 0, 0, 2, "l"/gm)||[]).length,6);
+ assert.equal((text.match(/^Text: 0, 0, 3, "l"/gm)||[]).length,6);
+ assert(!text.includes('Triangles:')); assert(!text.includes('Polygon:')); assert(!text.includes('CC density 21:'));
+ assert([...text.matchAll(/^Text:.*$/gm)].every(m=>/^Text: 0, 0, [23], "l"(?:, "|$)/.test(m[0])));
  for(const color of ['50 120 240','30 205 230','115 225 100','245 220 60','250 145 35','240 60 80'])assert(text.includes('Color: '+color));
- assert(text.includes('250 CC detection records')); assert(text.includes('255\nEnd:'));
+ assert(text.includes('250 CC detection records')); assert(text.includes('Font: 2, 10, 0, "Wingdings"'));
  const empty=Array.from(ccParts({...config,start:new Date(start+15*MIN).toISOString().replace('.000Z','Z'),end:new Date(start+16*MIN).toISOString().replace('.000Z','Z')},new DensityWindow())).join('');
  assert(!empty.includes('Object:')); assert(!empty.includes('Text:'));
 });

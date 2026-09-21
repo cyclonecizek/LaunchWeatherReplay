@@ -1,4 +1,4 @@
-import { circleSymbol } from './symbols';
+import { circleFonts, circleSymbol } from './symbols';
 import { KSC, encodeKscDate, readLimited } from './archive';
 import { csv, utc, grtime, validate, type Config, type Entry } from './replay';
 export type MerlinType='CG'|'CC';
@@ -48,7 +48,7 @@ export function* cgParts(c:Config,events:Detection[]){
 }
 export function* ccParts(c:Config,window:DensityWindow){
  const {a,b}=validate(c),trail=c.lightningMinutes*MIN;
- yield `Title: MERLIN CC density dots / approximately 1 km / trailing ${c.lightningMinutes} min\nThreshold: 999\n; One opaque dot per occupied cell; no on-map caption.\n; Counts are detection records, not flashes. Each minute T counts [T-trail,T).\n; Density colors: blue 1-4, cyan 5-19, green 20-49, yellow 50-99, orange 100-249, red 250+.\n`;
+ yield `Title: MERLIN CC density dots / approximately 1 km / trailing ${c.lightningMinutes} min\nThreshold: 999\n${circleFonts(3).join('\n')}\n; One opaque dot per occupied cell; no on-map caption.\n; Counts are detection records, not flashes. Each minute T counts [T-trail,T).\n; Density colors: blue 1-4, cyan 5-19, green 20-49, yellow 50-99, orange 100-249, red 250+.\n`;
  for(let t=a;t<b;t+=MIN){
   const counts=window.counts(t,trail);yield `TimeRange: ${grtime(t)} ${grtime(Math.min(t+MIN,b))}\n`;
   for(const [key,n] of counts){

@@ -1,5 +1,5 @@
 import coordinates from './sites-data.json';
-import { circleSymbol } from './symbols';
+import { circleFonts, circleSymbol } from './symbols';
 export const FIELD_MILL_RECOVERY_MINUTES = 15;
 const MILL_RED='255 65 65', MILL_YELLOW='255 205 35', MILL_GREEN='55 230 100';
 export type Kind='winds'|'fieldmills'|'lightning'|'profilers';
@@ -130,6 +130,7 @@ export function generate(kind:Kind,obs:Observation[],c:Config,notes:string[]=[])
  }
  frames.sort((x,y)=>x.start-y.start);
  const lines=header(`Replay / ${kind}${kind==='winds'?' / '+c.windHeight:kind==='profilers'?' / '+c.profilerHeight+'m AGL':''}`,kind==='winds'||kind==='profilers');
+ if(kind==='fieldmills')lines.push(...circleFonts(4));
  const intervals:[number,number][]=[];for(const f of frames){lines.push(`TimeRange: ${grtime(f.start)} ${grtime(f.end)}`,...display(f.o,kind,f.millColor));const last=intervals[intervals.length-1];if(last&&f.start<=last[1])last[1]=Math.max(last[1],f.end);else intervals.push([f.start,f.end]);}
  const report:Report={kind,records:obs.length,plotted:frames.length,first:frames.length?iso(frames.reduce((m,f)=>Math.min(m,f.o.time),Infinity)):null,last:frames.length?iso(frames.reduce((m,f)=>Math.max(m,f.o.time),-Infinity)):null,sites:new Set(frames.map(f=>f.o.site)).size,notes:[...notes,`Maximum display age: ${hold/MIN} minutes; no future observations and no interpolation.`],intervals};
  if(kind==='fieldmills')report.notes.push('Opaque circles: red when |E| >= 1000 V/m; otherwise yellow until 15 minutes after the most recent threshold observation at that mill, then green. Gaps do not create observations or prove a clear period.');
