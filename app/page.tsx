@@ -61,9 +61,9 @@ export default function Home(){
       }
      }else if(kind==='winds'||kind==='fieldmills'){
       if([new Date(a).getUTCFullYear(),new Date(b).getUTCFullYear()].some(y=>y<KSC_MIN_YEAR||y>KSC_MAX_YEAR))throw Error(`Automatic KSC export URLs support ${KSC_MIN_YEAR} through ${KSC_MAX_YEAR}.`);
-      const lookback=kind==='winds'?7*60000:2*60000;let chunk=0;
-      // Include antecedent observations at the start, splitting at UTC New Year.
-      const begin=Math.max(a-lookback,Date.UTC(new Date(a).getUTCFullYear(),0,1));
+      const lookback=kind==='winds'?7*60000:15*60000;let chunk=0;
+      // Include antecedent observations, clamped to the earliest supported archive year.
+      const begin=Math.max(a-lookback,Date.UTC(2000,0,1));
       for(let t=begin;t<b;t+=3600000){
        chunk++;setStatus(`Fetching ${label}, hour ${chunk} of ${Math.ceil((b-begin)/3600000)}…`);
        const responses=await Promise.allSettled(Array.from({length:kind==='winds'?4:1},(_,g)=>api('/api/ksc',{kind,group:String(g),start:new Date(t).toISOString(),end:new Date(Math.min(b,t+3600000)).toISOString()},controller.signal)));

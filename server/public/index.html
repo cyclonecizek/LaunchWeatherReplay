@@ -20,11 +20,13 @@
 <h2 class="second"><span class="number">02</span> Choose observations</h2>
 <label class="check"><input type="checkbox" id="winds" checked><span>Wind towers</span></label>
 <label class="setting">Tower height<select id="windHeight"><option value="54">54 feet</option><option value="surface">Surface (up to 20 feet)</option><option value="lowest">Lowest available</option><option value="200plus">Lowest at or above 200 feet</option></select></label>
-<label class="check"><input type="checkbox" id="fieldmills" checked><span>Field mills</span></label>
+<label class="check"><input type="checkbox" id="fieldmills" checked><span>Field mills · colored circles</span></label>
 <label class="check"><input type="checkbox" id="merlin" checked><span>MERLIN lightning · CG and grouped CC</span></label>
 <label class="setting">Lightning trail<select id="trail"><option value="1">1 minute</option><option value="5">5 minutes</option><option value="10">10 minutes</option><option value="15">15 minutes</option><option value="30">30 minutes</option><option value="45">45 minutes</option><option value="60" selected>60 minutes</option></select></label>
-<p class="note">CC detections are grouped into approximately 1 km cells and updated each minute. Archive coverage varies by date and source.</p>
-<label class="check partial"><input type="checkbox" id="allowPartial"><span>Allow a partial package if a selected source is unavailable</span></label><p class="note">Missing sources will be listed before download and in the ZIP. Leave this unchecked to require every selected source.</p>
+<p class="note">CC detections appear as solid dots colored by the count in each approximately 1 km cell, updated each minute. Archive coverage varies by date and source.</p>
+<p class="note">Field mills: red at |E| ≥ 1,000 V/m; yellow below that threshold if reached within the last 15 minutes; otherwise green.</p>
+<label class="check partial"><input type="checkbox" id="allowPartial"><span>Allow a partial package if a selected source is unavailable</span></label>
+<p class="note">Missing sources will be listed before download and in the ZIP. Leave this unchecked to require every selected source.</p>
 <p id="form-error" class="error" role="alert" hidden></p>
 <button id="build" type="submit">Build scenario ZIP</button>
 </section></form>

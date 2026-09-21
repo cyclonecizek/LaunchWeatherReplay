@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { configFromEnv, run, writeParts } from '../scripts/scenario-job';
-import { BUCKET } from '../lib/archive';
+import { BUCKET, kscURL } from '../lib/archive';
 
 test('UTC validation rejects reversed dates and retains 24-hour UTC values', () => {
   assert.equal(configFromEnv({ SCENARIO_START: '2024-06-25 23:00', SCENARIO_END: '2024-06-26 00:00' }).start, '2024-06-25T23:00Z');
@@ -17,9 +17,9 @@ test('completed scenario ZIP has radar, synchronized layers, icons and no raw CS
   const output = await mkdtemp(join(tmpdir(), 'scenario-test-'));
   const originalFetch = globalThis.fetch;
   const radar = Buffer.from('AR2V0006 fixture bytes for transfer-integrity test only');
-  let failRadar = false, failKsc = false;
+  let failRadar = false, failKsc = false; const requested: string[] = [];
   globalThis.fetch = async input => {
-    const url = String(input);
+    const url = String(input); requested.push(url);
     if (url.startsWith(BUCKET) && url.includes('list-type')) return new Response(`<ListBucketResult><Contents><Key>2024/06/25/KMLB/KMLB20240625_210000_V06</Key><Size>${radar.length}</Size></Contents></ListBucketResult>`);
     if (url.startsWith(BUCKET)) return new Response(failRadar ? radar.subarray(0, 10) : radar);
     if (failKsc) return new Response('Unavailable', { status: 503 });
@@ -31,6 +31,7 @@ test('completed scenario ZIP has radar, synchronized layers, icons and no raw CS
   const env = { SCENARIO_START: '2024-06-25T21:00', SCENARIO_END: '2024-06-25T21:02', SCENARIO_TRAIL: '1', SCENARIO_OUTPUT: output };
   try {
     const zip = await run(env);
+    assert(requested.includes(kscURL('fieldmills', 0, '2024-06-25T20:45Z', '2024-06-25T21:02Z')), 'Retrieval must include the 15-minute field-mill history');
     execFileSync('python3', ['-c', `import zipfile,sys,json
 with zipfile.ZipFile(sys.argv[1]) as z:
  assert z.testzip() is None

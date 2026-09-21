@@ -1,4 +1,7 @@
 import coordinates from './sites-data.json';
+import { circleSymbol } from './symbols';
+export const FIELD_MILL_RECOVERY_MINUTES = 15;
+const MILL_RED='255 65 65', MILL_YELLOW='255 205 35', MILL_GREEN='55 230 100';
 export type Kind='winds'|'fieldmills'|'lightning'|'profilers';
 export type Config={name:string;start:string;end:string;radar:string;layers:Kind[];windHeight:string;lightningMinutes:number;profilerHeight:number};
 export type Entry={name:string;text:string};
@@ -72,7 +75,7 @@ export function parse(kind:Kind,text:string):{obs:Observation[];notes:string[];t
 }
 const esc=(s:string)=>s.replace(/\\/g,'\\\\').replace(/"/g,'\\"').replace(/\r/g,'').replace(/\n/g,'\\n');
 function header(title:string,barbs=false){return [`Title: ${title}`,'Threshold: 999','Font: 1, 13, 1, "Arial"','; UTC TimeRange. Requires GR placefile v1.5 support; verify in GR2Analyst.',...(barbs?['IconFile: 1, 96, 96, 48, 48, "wind_barb.png"']:[])];}
-function display(o:Observation,kind:Kind){
+function display(o:Observation,kind:Kind,millColor?:string){
  let hover=`${o.site}\nObservation: ${iso(o.time)}\n`;const out=[`Object: ${o.lat}, ${o.lon}`];
  if(kind==='winds'||kind==='profilers'){
   hover+=`Height: ${o.height} ${kind==='winds'?'ft':'m AGL'}\nWind: ${o.dir} deg at ${o.speed} kt`;
@@ -84,14 +87,15 @@ function display(o:Observation,kind:Kind){
   if(o.dew!==undefined&&o.dew>-100&&o.dew<150)out.push('Color: 70 245 120',`Text: -30, -10, 1, "${o.dew.toFixed(0)}", "${h}"`);
   if(o.peak!==undefined&&o.peak>=0&&o.peak<300)out.push('Color: 255 255 255',`Text: 31, -10, 1, "${o.peak.toFixed(0)}", "${h}"`);
  } else if(kind==='fieldmills'){
-  const v=o.value!,color=Math.abs(v)>=1000?'255 65 65':Math.abs(v)>=500?'255 205 35':'55 230 100';
-  out.push(`Color: ${color}`,`Text: 0, 0, 1, "${o.site} ${v>=0?'+':''}${v.toFixed(0)}", "${esc(hover+`1-min mean: ${v} V/m`)}"`);
+  const v=o.value!;
+  const status=millColor===MILL_RED?'At or above 1000 V/m magnitude':millColor===MILL_YELLOW?'Below 1000 V/m; a threshold reading occurred within the last 15 minutes':'Below 1000 V/m; no threshold reading in the available last 15 minutes';
+  out.push(...circleSymbol(millColor||MILL_GREEN,4,hover+`1-min mean: ${v} V/m\n${status}`));
  }else out.push(`Color: ${o.type==='CG'?'255 210 80':'120 210 255'}`,`Text: 0, 0, 1, "${o.type==='CG'?'+':'x'}", "${esc(hover+o.type+(o.value!==undefined?`\nPeak current: ${o.value} kA`:''))}"`);
  out.push('End:');return out;
 }
 export function generate(kind:Kind,obs:Observation[],c:Config,notes:string[]=[]){
  const {a,b}=validate(c);const hold=kind==='winds'?7*MIN:kind==='fieldmills'?2*MIN:kind==='profilers'?10*MIN:c.lightningMinutes*MIN;
- const candidates=obs.filter(o=>o.time<b&&o.time+hold>a);
+ const candidates=obs.filter(o=>o.time<b&&(kind==='fieldmills'?o.time>=a-FIELD_MILL_RECOVERY_MINUTES*MIN:o.time+hold>a));
  const groups=new Map<string,Observation[]>();
  for(const o of candidates){const key=kind==='lightning'?`${groups.size}`:`${o.site}|${o.time}`;groups.set(key,[...(groups.get(key)||[]),o]);}
  const selected:Observation[]=[];
@@ -107,12 +111,28 @@ export function generate(kind:Kind,obs:Observation[],c:Config,notes:string[]=[])
   }else selected.push(group[group.length-1]);
  }
  const bySite=new Map<string,Observation[]>();for(const o of selected){const k=kind==='lightning'?`${bySite.size}`:o.site;bySite.set(k,[...(bySite.get(k)||[]),o]);}
- const frames:{o:Observation;start:number;end:number}[]=[];
- for(const group of bySite.values()){group.sort((x,y)=>x.time-y.time);for(let i=0;i<group.length;i++){const o=group[i],start=Math.ceil(Math.max(a,o.time)/1000)*1000,end=Math.floor(Math.min(b,o.time+hold,group[i+1]?.time??Infinity)/1000)*1000;if(end>start)frames.push({o,start,end});}}
+ const frames:{o:Observation;start:number;end:number;millColor?:string}[]=[];
+ for(const group of bySite.values()){
+  group.sort((x,y)=>x.time-y.time);let lastHigh=-Infinity;
+  for(let i=0;i<group.length;i++){
+   const o=group[i],high=kind==='fieldmills'&&Math.abs(o.value!)>=1000;
+   if(high)lastHigh=o.time;
+   const start=Math.ceil(Math.max(a,o.time)/1000)*1000,end=Math.floor(Math.min(b,o.time+hold,group[i+1]?.time??Infinity)/1000)*1000;
+   if(end<=start)continue;
+   if(kind!=='fieldmills'){frames.push({o,start,end});continue;}
+   if(high){frames.push({o,start,end,millColor:MILL_RED});continue;}
+   const recoveryEnd=Math.ceil((lastHigh+FIELD_MILL_RECOVERY_MINUTES*MIN)/1000)*1000;
+   const yellowEnd=Math.min(end,recoveryEnd);
+   if(yellowEnd>start)frames.push({o,start,end:yellowEnd,millColor:MILL_YELLOW});
+   const greenStart=Math.max(start,recoveryEnd);
+   if(end>greenStart)frames.push({o,start:greenStart,end,millColor:MILL_GREEN});
+  }
+ }
  frames.sort((x,y)=>x.start-y.start);
  const lines=header(`Replay / ${kind}${kind==='winds'?' / '+c.windHeight:kind==='profilers'?' / '+c.profilerHeight+'m AGL':''}`,kind==='winds'||kind==='profilers');
- const intervals:[number,number][]=[];for(const f of frames){lines.push(`TimeRange: ${grtime(f.start)} ${grtime(f.end)}`,...display(f.o,kind));const last=intervals[intervals.length-1];if(last&&f.start<=last[1])last[1]=Math.max(last[1],f.end);else intervals.push([f.start,f.end]);}
+ const intervals:[number,number][]=[];for(const f of frames){lines.push(`TimeRange: ${grtime(f.start)} ${grtime(f.end)}`,...display(f.o,kind,f.millColor));const last=intervals[intervals.length-1];if(last&&f.start<=last[1])last[1]=Math.max(last[1],f.end);else intervals.push([f.start,f.end]);}
  const report:Report={kind,records:obs.length,plotted:frames.length,first:frames.length?iso(frames.reduce((m,f)=>Math.min(m,f.o.time),Infinity)):null,last:frames.length?iso(frames.reduce((m,f)=>Math.max(m,f.o.time),-Infinity)):null,sites:new Set(frames.map(f=>f.o.site)).size,notes:[...notes,`Maximum display age: ${hold/MIN} minutes; no future observations and no interpolation.`],intervals};
+ if(kind==='fieldmills')report.notes.push('Opaque circles: red when |E| >= 1000 V/m; otherwise yellow until 15 minutes after the most recent threshold observation at that mill, then green. Gaps do not create observations or prove a clear period.');
  if(kind==='profilers')report.notes.push(`Nearest height to ${c.profilerHeight} m AGL within 250 m; the actual height is labeled.`);
  if(!frames.length)report.notes.push('No plottable data overlaps this window and layer selection.');
  return {entry:{name:`placefiles/${kind}.txt`,text:lines.join('\n')+'\n'},report};

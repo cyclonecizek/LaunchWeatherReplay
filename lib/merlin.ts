@@ -1,3 +1,4 @@
+import { circleSymbol } from './symbols';
 import { KSC, encodeKscDate, readLimited } from './archive';
 import { csv, utc, grtime, validate, type Config, type Entry } from './replay';
 export type MerlinType='CG'|'CC';
@@ -47,13 +48,14 @@ export function* cgParts(c:Config,events:Detection[]){
 }
 export function* ccParts(c:Config,window:DensityWindow){
  const {a,b}=validate(c),trail=c.lightningMinutes*MIN;
- yield `Title: MERLIN CC density / approximately 1 km / trailing ${c.lightningMinutes} min\nThreshold: 999\nFont: 1, 12, 1, "Arial"\n; Counts are detection records, not flashes. Each minute T counts [T-trail,T).\n; Density colors: blue 1-4, cyan 5-19, green 20-49, yellow 50-99, orange 100-249, red 250+.\n`;
+ yield `Title: MERLIN CC density dots / approximately 1 km / trailing ${c.lightningMinutes} min\nThreshold: 999\n; One opaque dot per occupied cell; no on-map caption.\n; Counts are detection records, not flashes. Each minute T counts [T-trail,T).\n; Density colors: blue 1-4, cyan 5-19, green 20-49, yellow 50-99, orange 100-249, red 250+.\n`;
  for(let t=a;t<b;t+=MIN){
-  const counts=window.counts(t,trail);yield `TimeRange: ${grtime(t)} ${grtime(Math.min(t+MIN,b))}\n`;let total=0;
-  if(counts.size)yield 'Triangles:\n';
-  for(const [key,n] of counts){total+=n;const [i,j]=key.split(',').map(Number);let cell='';for(const [x,y] of [[i,j],[i+1,j],[i+1,j+1],[i,j],[i+1,j+1],[i,j+1]])cell+=`${(28.5+y/KM_LAT).toFixed(7)}, ${(-80.6+x/KM_LON).toFixed(7)}, ${color(n)}, 90\n`;yield cell;}
-  if(counts.size)yield 'End:\n';
-  yield `Color: 255 255 255\nText: 28.36, -80.46, 1, "CC density ${grtime(t).slice(11,16)}Z / ${c.lightningMinutes} min / 1 km", "${total} detection records in ${counts.size} occupied cells. End-exclusive window."\n`;
+  const counts=window.counts(t,trail);yield `TimeRange: ${grtime(t)} ${grtime(Math.min(t+MIN,b))}\n`;
+  for(const [key,n] of counts){
+   const [i,j]=key.split(',').map(Number);
+   const lat=(28.5+(j+0.5)/KM_LAT).toFixed(7),lon=(-80.6+(i+0.5)/KM_LON).toFixed(7);
+   yield [`Object: ${lat}, ${lon}`,...circleSymbol(color(n),3,`${n} CC detection records / approximately 1 km cell / trailing ${c.lightningMinutes} min / ${grtime(t)}Z`),'End:',''].join('\n');
+  }
  }
 }
 export function merlinEntries(c:Config,chunks:MerlinChunk[],includeRaw=true):Entry[]{
