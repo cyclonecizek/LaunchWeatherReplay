@@ -33,7 +33,7 @@ The ZIP is uploaded directly, with no extra ZIP wrapped around it.
 
 - `radar/<site>/`: unchanged archived Level II volumes.
 - `placefiles/`: selected weather layers and the replay clock check.
-- `placefiles/wind_barb.png` and `FIX_ICON_PATHS.cmd`: included when towers are available. Instructions also explain manually setting the icon path if scripts cannot run.
+- `placefiles/wind_barb.png`, `placefiles/field_mill.png`, and `FIX_ICON_PATHS.cmd`: included when towers or field mills are available. Instructions also explain manually setting the icon path if scripts cannot run.
 - `README.txt`: GR setup and missing-source notes.
 - `manifest.json`: small coverage/provenance record, including source hashes; no raw CSVs.
 
