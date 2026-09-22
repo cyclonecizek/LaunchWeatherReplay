@@ -9,7 +9,7 @@ const reading=(minute:number,value:number,site='FM01'):Observation=>({time:start
 function frames(obs:Observation[]){
  const text=generate('fieldmills',obs,config).entry.text;
  assert(!text.includes('Polygon:')); assert(text.includes('Font: 2, 12, 0, "Wingdings"'));
- assert([...text.matchAll(/^Text:.*$/gm)].every(m=>/^Text: 0, 0, [23], "l"(?:, "|$)/.test(m[0])));
+ assert([...text.matchAll(/^Text:.*$/gm)].every(m=>/^Text: 0, 0, [23], "l"(?:, "|$)/.test(m[0])||/^Text: 0, -14, 1, "-?\d+", "/.test(m[0])));
  return text.split('TimeRange: ').slice(1).map(part=>{
   const [a,b]=part.split('\n',1)[0].split(' ');
   return {a:Date.parse(a+'Z'),b:Date.parse(b+'Z'),color:[...part.matchAll(/Color: ([^\n]+)/g)].at(-1)![1],part};
@@ -30,6 +30,8 @@ test('field circles use magnitude, include pre-start history, and split at exact
  assert.deepEqual(colorsAt(f,7),[]); // Recovery never prolongs stale measurements.
  assert(f.some(x=>x.part.includes('1-min mean: -1000 V/m'))); // Signed values remain on hover.
  assert(f.every(x=>x.part.includes('Text: 0, 0, 2, "l", "FM01')));
+ assert(f.some(x=>x.part.includes('Text: 0, -14, 1, "-1000"'))); // Rounded value is also a visible map label.
+ assert(colorsAt(f,2).every(color=>color===RED)&&f.some(x=>x.a<=start+2*MIN&&x.b>start+2*MIN&&x.part.includes(`Color: ${RED}\nText: 0, -14, 1, "1000"`))); // Label matches the circle's color.
 });
 
 test('recovery is station-local, renewed by later exceedances, and excludes future readings',()=>{

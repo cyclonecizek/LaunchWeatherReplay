@@ -89,7 +89,8 @@ function display(o:Observation,kind:Kind,millColor?:string){
  } else if(kind==='fieldmills'){
   const v=o.value!;
   const status=millColor===MILL_RED?'At or above 1000 V/m magnitude':millColor===MILL_YELLOW?'Below 1000 V/m; a threshold reading occurred within the last 15 minutes':'Below 1000 V/m; no threshold reading in the available last 15 minutes';
-  out.push(...circleSymbol(millColor||MILL_GREEN,4,hover+`1-min mean: ${v} V/m\n${status}`));
+  const color=millColor||MILL_GREEN,full=hover+`1-min mean: ${v} V/m\n${status}`;
+  out.push(...circleSymbol(color,4,full),`Color: ${color}`,`Text: 0, -14, 1, "${Math.round(v)}", "${esc(full)}"`);
  }else out.push(`Color: ${o.type==='CG'?'255 210 80':'120 210 255'}`,`Text: 0, 0, 1, "${o.type==='CG'?'+':'x'}", "${esc(hover+o.type+(o.value!==undefined?`\nPeak current: ${o.value} kA`:''))}"`);
  out.push('End:');return out;
 }
@@ -133,7 +134,7 @@ export function generate(kind:Kind,obs:Observation[],c:Config,notes:string[]=[])
  if(kind==='fieldmills')lines.push(...circleFonts(4));
  const intervals:[number,number][]=[];for(const f of frames){lines.push(`TimeRange: ${grtime(f.start)} ${grtime(f.end)}`,...display(f.o,kind,f.millColor));const last=intervals[intervals.length-1];if(last&&f.start<=last[1])last[1]=Math.max(last[1],f.end);else intervals.push([f.start,f.end]);}
  const report:Report={kind,records:obs.length,plotted:frames.length,first:frames.length?iso(frames.reduce((m,f)=>Math.min(m,f.o.time),Infinity)):null,last:frames.length?iso(frames.reduce((m,f)=>Math.max(m,f.o.time),-Infinity)):null,sites:new Set(frames.map(f=>f.o.site)).size,notes:[...notes,`Maximum display age: ${hold/MIN} minutes; no future observations and no interpolation.`],intervals};
- if(kind==='fieldmills')report.notes.push('Opaque circles: red when |E| >= 1000 V/m; otherwise yellow until 15 minutes after the most recent threshold observation at that mill, then green. Gaps do not create observations or prove a clear period.');
+ if(kind==='fieldmills')report.notes.push('Opaque circles labeled with the rounded 1-minute mean (V/m): red when |E| >= 1000 V/m; otherwise yellow until 15 minutes after the most recent threshold observation at that mill, then green. Gaps do not create observations or prove a clear period.');
  if(kind==='profilers')report.notes.push(`Nearest height to ${c.profilerHeight} m AGL within 250 m; the actual height is labeled.`);
  if(!frames.length)report.notes.push('No plottable data overlaps this window and layer selection.');
  return {entry:{name:`placefiles/${kind}.txt`,text:lines.join('\n')+'\n'},report};
