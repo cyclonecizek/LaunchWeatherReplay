@@ -6,19 +6,23 @@ import { ccParts, DensityWindow } from '../lib/merlin';
 const start=Date.parse('2024-06-25T21:00Z'), MIN=60000;
 const config:Config={name:'symbols',start:new Date(start).toISOString().replace('.000Z','Z'),end:new Date(start+30*MIN).toISOString().replace('.000Z','Z'),radar:'KMLB',layers:['fieldmills'],windHeight:'54',lightningMinutes:15,profilerHeight:1000};
 const reading=(minute:number,value:number,site='FM01'):Observation=>({time:start+minute*MIN,value,site,lat:site==='FM01'?28.5:28.6,lon:-80.6});
+const RED='255 65 65',YELLOW='255 205 35',GREEN='55 230 100';
+const ICON_INDEX:Record<string,string>={[RED]:'0',[YELLOW]:'1',[GREEN]:'2'};
 function frames(obs:Observation[]){
  const text=generate('fieldmills',obs,config).entry.text;
- assert(!text.includes('Polygon:')); assert(text.includes('Font: 2, 12, 0, "Wingdings"'));
- assert([...text.matchAll(/^Text:.*$/gm)].every(m=>/^Text: 0, 0, [23], "l"(?:, "|$)/.test(m[0])||/^Text: 0, -14, 1, "-?\d+", "/.test(m[0])));
+ assert(!text.includes('Polygon:')); assert(!text.includes('Wingdings'));
+ assert(text.includes('IconFile: 2, 20, 20, 10, 10, "field_mill.png"'));
+ assert([...text.matchAll(/^Icon:.*$/gm)].every(m=>/^Icon: 0, 0, 0, 2, [012], "/.test(m[0])));
+ assert([...text.matchAll(/^Text:.*$/gm)].every(m=>/^Text: 0, -14, 1, "-?\d+", "/.test(m[0])));
  return text.split('TimeRange: ').slice(1).map(part=>{
   const [a,b]=part.split('\n',1)[0].split(' ');
-  return {a:Date.parse(a+'Z'),b:Date.parse(b+'Z'),color:[...part.matchAll(/Color: ([^\n]+)/g)].at(-1)![1],part};
+  const color=[...part.matchAll(/Color: ([^\n]+)/g)].at(-1)![1],icon=/Icon: 0, 0, 0, 2, (\d), /.exec(part)![1];
+  return {a:Date.parse(a+'Z'),b:Date.parse(b+'Z'),color,icon,part};
  });
 }
-const RED='255 65 65',YELLOW='255 205 35',GREEN='55 230 100';
 const colorsAt=(f:ReturnType<typeof frames>,minute:number)=>f.filter(x=>x.a<=start+minute*MIN&&x.b>start+minute*MIN).map(x=>x.color);
 
-test('field circles use magnitude, include pre-start history, and split at exact recovery expiry',()=>{
+test('field points use magnitude, include pre-start history, and split at exact recovery expiry',()=>{
  const f=frames([reading(-14.5,-1200),reading(0,800),reading(1,-999),reading(2,1000),reading(3,0),reading(4,-1000),reading(5,400)]);
  assert.deepEqual(colorsAt(f,0),[YELLOW]);
  assert.deepEqual(colorsAt(f,0.5),[GREEN]); // No new observation needed to end recovery.
@@ -29,9 +33,9 @@ test('field circles use magnitude, include pre-start history, and split at exact
  assert.deepEqual(colorsAt(f,5),[YELLOW]);
  assert.deepEqual(colorsAt(f,7),[]); // Recovery never prolongs stale measurements.
  assert(f.some(x=>x.part.includes('1-min mean: -1000 V/m'))); // Signed values remain on hover.
- assert(f.every(x=>x.part.includes('Text: 0, 0, 2, "l", "FM01')));
+ assert(f.every(x=>x.part.includes('"FM01')));
  assert(f.some(x=>x.part.includes('Text: 0, -14, 1, "-1000"'))); // Rounded value is also a visible map label.
- assert(colorsAt(f,2).every(color=>color===RED)&&f.some(x=>x.a<=start+2*MIN&&x.b>start+2*MIN&&x.part.includes(`Color: ${RED}\nText: 0, -14, 1, "1000"`))); // Label matches the circle's color.
+ assert(f.every(x=>ICON_INDEX[x.color]===x.icon)); // The icon (point color) always matches the label's color.
 });
 
 test('recovery is station-local, renewed by later exceedances, and excludes future readings',()=>{

@@ -37,7 +37,7 @@ with zipfile.ZipFile(sys.argv[1]) as z:
  assert z.testzip() is None
  names=z.namelist()
  assert not any(n.endswith('.csv') or '/raw/' in n for n in names)
- expected={'README.txt','manifest.json','FIX_ICON_PATHS.cmd','placefiles/wind_barb.png','placefiles/winds.txt','placefiles/fieldmills.txt','placefiles/merlin_cg.txt','placefiles/merlin_cc_density.txt','placefiles/replay_clock_check.txt','radar/KMLB/KMLB20240625_210000_V06'}
+ expected={'README.txt','manifest.json','FIX_ICON_PATHS.cmd','placefiles/wind_barb.png','placefiles/field_mill.png','placefiles/winds.txt','placefiles/fieldmills.txt','placefiles/merlin_cg.txt','placefiles/merlin_cc_density.txt','placefiles/replay_clock_check.txt','radar/KMLB/KMLB20240625_210000_V06'}
  assert {'/'.join(n.split('/')[1:]) for n in names} == expected
  prefix=names[0].split('/')[0]+'/'
  assert z.read(prefix+'radar/KMLB/KMLB20240625_210000_V06') == b'AR2V0006 fixture bytes for transfer-integrity test only'
