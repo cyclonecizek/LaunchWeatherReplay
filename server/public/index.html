@@ -23,7 +23,7 @@
 <label class="check"><input type="checkbox" id="fieldmills" checked><span>Field mills · colored circles</span></label>
 <label class="check"><input type="checkbox" id="merlin" checked><span>MERLIN lightning · CG and grouped CC</span></label>
 <label class="setting">Lightning trail<select id="trail"><option value="1">1 minute</option><option value="5">5 minutes</option><option value="10">10 minutes</option><option value="15">15 minutes</option><option value="30">30 minutes</option><option value="45">45 minutes</option><option value="60" selected>60 minutes</option></select></label>
-<p class="note">CC detections appear as solid dots colored by the count in each approximately 1 km cell, updated each minute. Archive coverage varies by date and source.</p>
+<p class="note">CC detections appear as solid dots colored by the count in each approximately 1 km cell, updated each minute.</p>
 <p class="note">Field mills: red at |E| ≥ 1,000 V/m; yellow below that threshold if reached within the last 15 minutes; otherwise green.</p>
 <label class="check partial"><input type="checkbox" id="allowPartial"><span>Allow a partial package if a selected source is unavailable</span></label>
 <p class="note">Missing sources will be listed before download and in the ZIP. Leave this unchecked to require every selected source.</p>
@@ -33,7 +33,49 @@
 <aside>
 <section class="panel status-panel" aria-labelledby="status-heading"><p class="eyebrow">YOUR SCENARIO</p><h2 id="status-heading">Ready when you are.</h2><div id="status" role="status" aria-live="polite"><p>Select a time window and observations to begin.</p></div><progress id="progress" aria-label="Scenario build in progress" hidden></progress><p id="job-window" class="note"></p><ul id="missing" class="missing" hidden></ul><a id="download" class="button" hidden>Download ZIP</a><p id="expiry" class="note"></p><button id="another" class="secondary" type="button" hidden>Build another scenario</button><p class="note">Keep this tab or save its address to return to your build. Downloads are temporary; the expiry time appears when yours is ready.</p></section>
 <section class="panel"><h2>Check office access</h2><p>Try a small ZIP from this server before building a larger scenario.</p><a id="network-test" href="./network-test.zip">Download test ZIP</a><p class="note">This checks the download domain your network will use. A successful page load alone does not check ZIP access.</p></section>
+<section class="panel">
+  <h2>One replay clock</h2>
+  <p class="note">Each observation gets a UTC validity window, so GR shows the right reading for each layer as you play, pause, or step through the archived radar — illustrated below.</p>
+  <div class="clock-diagram">
+    <svg viewBox="0 0 420 164" role="img" aria-label="Diagram of radar, wind, field mill, and lightning observations aligned on one UTC playhead, each layer showing only its own currently valid reading.">
+      <text x="0" y="18" font-size="11" fill="#acbfd0">Radar volume</text>
+      <line x1="128" y1="14" x2="420" y2="14" stroke="#304b60" stroke-width="1"/>
+      <rect x="358" y="7" width="20" height="14" fill="#86d8f5" opacity="0.16"/>
+      <circle cx="158" cy="14" r="3" fill="#3c5b72"/>
+      <circle cx="258" cy="14" r="3" fill="#3c5b72"/>
+      <circle cx="358" cy="14" r="4" fill="#86d8f5"/>
+      <circle cx="418" cy="14" r="3" fill="#3c5b72"/>
+      <text x="0" y="52" font-size="11" fill="#acbfd0">Wind tower</text>
+      <line x1="128" y1="48" x2="420" y2="48" stroke="#304b60" stroke-width="1"/>
+      <rect x="278" y="41" width="100" height="14" fill="#7fd6ae" opacity="0.16"/>
+      <circle cx="138" cy="48" r="3" fill="#3c5b72"/>
+      <circle cx="278" cy="48" r="4" fill="#7fd6ae"/>
+      <circle cx="418" cy="48" r="3" fill="#3c5b72"/>
+      <text x="0" y="86" font-size="11" fill="#acbfd0">Field mill</text>
+      <line x1="128" y1="82" x2="420" y2="82" stroke="#304b60" stroke-width="1"/>
+      <rect x="348" y="75" width="30" height="14" fill="#f2c15c" opacity="0.16"/>
+      <circle cx="188" cy="82" r="3" fill="#3c5b72"/>
+      <circle cx="268" cy="82" r="3" fill="#3c5b72"/>
+      <circle cx="348" cy="82" r="4" fill="#f2c15c"/>
+      <circle cx="418" cy="82" r="3" fill="#3c5b72"/>
+      <text x="0" y="120" font-size="11" fill="#acbfd0">Lightning trail</text>
+      <line x1="128" y1="116" x2="420" y2="116" stroke="#304b60" stroke-width="1"/>
+      <circle cx="168" cy="116" r="3" fill="#3c5b72"/>
+      <circle cx="218" cy="116" r="3" fill="#3c5b72"/>
+      <circle cx="308" cy="116" r="3" fill="#3c5b72"/>
+      <circle cx="398" cy="116" r="3" fill="#3c5b72"/>
+      <line x1="378" y1="2" x2="378" y2="158" stroke="#e8f1f8" stroke-width="1.5" stroke-dasharray="3 3"/>
+      <text x="378" y="156" font-size="10" fill="#e8f1f8" text-anchor="middle">playhead</text>
+    </svg>
+  </div>
+  <details>
+    <summary>About data &amp; limits</summary>
+    <p>Towers expire after 7 minutes, mills after 2, or sooner when replaced; lightning uses your selected trail. Future observations are never shown, and gaps stay visible rather than being filled in — the lightning row above shows one, past its trail.</p>
+    <p>Archive coverage varies by date and source; source availability does not establish complete sensor coverage. Field-mill and CC colors are visualization categories, not launch criteria.</p>
+    <p>Packages contain radar, placefiles, required icons, and instructions. Raw CSVs and profilers are excluded. Playback requires verification in your installed GR2Analyst 3.0, 3.2, or 3.4 — ZIP validation confirms file integrity, not GR compatibility.</p>
+  </details>
+</section>
 </aside></div>
-<section class="instructions"><h2>From download to replay</h2><ol><li>Extract the complete ZIP to a permanent folder and read <code>README.txt</code>.</li><li>If wind icons are included, run <code>FIX_ICON_PATHS.cmd</code> or follow the manual path instructions.</li><li>Stop live polling in GR and open the files in the radar folder.</li><li>Add <code>replay_clock_check.txt</code> in Placefile Manager and check that its time follows the radar. Then add the remaining placefiles.</li></ol><p class="note">Packages contain radar, placefiles, required icons, and instructions. Raw CSVs and profilers are excluded. Playback requires verification in your installed GR2Analyst 3.0, 3.2, or 3.4.</p></section>
-<footer>Source availability does not establish complete sensor coverage. Display colors are not launch criteria. <a href="https://github.com/cyclonecizek/LaunchWeatherReplay">Project on GitHub</a></footer>
+<section class="instructions"><h2>From download to replay</h2><ol><li>Extract the complete ZIP to a permanent folder and read <code>README.txt</code>.</li><li>If wind icons are included, run <code>FIX_ICON_PATHS.cmd</code> or follow the manual path instructions.</li><li>Stop live polling in GR and open the files in the radar folder.</li><li>Add <code>replay_clock_check.txt</code> in Placefile Manager and check that its time follows the radar. Then add the remaining placefiles.</li></ol></section>
+<footer><a href="https://github.com/cyclonecizek/LaunchWeatherReplay">Project on GitHub</a></footer>
 </main></body></html>
