@@ -32,6 +32,8 @@ test('field circles use magnitude, include pre-start history, and split at exact
  assert(f.every(x=>x.part.includes('Text: 0, 0, 2, "l", "FM01')));
  assert(f.some(x=>x.part.includes('Text: 0, -14, 1, "-1000"'))); // Rounded value is also a visible map label.
  assert(colorsAt(f,2).every(color=>color===RED)&&f.some(x=>x.a<=start+2*MIN&&x.b>start+2*MIN&&x.part.includes(`Color: ${RED}\nText: 0, -14, 1, "1000"`))); // Label matches the circle's color.
+ assert(f.some(x=>x.a<=start&&x.b>start&&x.part.includes('reached -1200 V/m at 20:45:30 UTC'))); // Yellow hover names the pre-start reading that triggered it, not just "within 15 minutes."
+ assert(f.some(x=>x.a<=start+3*MIN&&x.b>start+3*MIN&&x.part.includes('reached 1000 V/m at 21:02:00 UTC'))); // ...and the most recent trigger, even once it's no longer the current reading.
 });
 
 test('recovery is station-local, renewed by later exceedances, and excludes future readings',()=>{
