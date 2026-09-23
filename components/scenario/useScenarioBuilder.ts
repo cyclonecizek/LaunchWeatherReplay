@@ -15,9 +15,9 @@ export function useScenarioBuilder() {
   const [start, setStart] = useState('2024-06-25T21:00');
   const [end, setEnd] = useState('2024-06-25T23:00');
   const [radar, setRadar] = useState('KMLB');
-  const [selected, setSelected] = useState<Kind[]>(['winds', 'fieldmills', 'lightning']);
+  const [selected, setSelected] = useState<Kind[]>(['fieldmills', 'lightning']);
   const [windHeight, setWindHeight] = useState('54');
-  const [lightningMinutes, setLightningMinutes] = useState('60');
+  const [lightningMinutes, setLightningMinutes] = useState('30');
   const [profilerHeight, setProfilerHeight] = useState('1000');
   const [uploads, setUploads] = useState<Partial<Record<Kind, File[]>>>({});
   const [prepared, setPrepared] = useState<Prepared | null>(null);
