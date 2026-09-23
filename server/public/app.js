@@ -30,7 +30,6 @@ function changed(startChanged) {
 for (const part of ['start', 'end']) for (const unit of ['Date', 'Hour', 'Minute']) $(part + unit).addEventListener('change', () => changed(part === 'start'));
 $('winds').onchange = () => { $('windHeight').disabled = !$('winds').checked; };
 $('merlin').onchange = () => { $('trail').disabled = !$('merlin').checked; };
-$('network-test').href = api + '/network-test.zip';
 function busy(value) { active = value; $('build').disabled = value; $('build').textContent = value ? 'Build in progress…' : 'Build scenario ZIP'; }
 function render(job) {
   $('status-heading').textContent = ({ queued: 'Waiting to build', running: 'Building your replay', complete: job.missing?.length ? 'Partial replay ready' : 'Your replay is ready', failed: 'Build could not finish', expired: 'Download expired' })[job.state] || 'Checking build';
