@@ -1,8 +1,7 @@
 import coordinates from './sites-data.json';
+import { circleFonts, circleSymbol } from './symbols';
 export const FIELD_MILL_RECOVERY_MINUTES = 15;
 const MILL_RED='255 65 65', MILL_YELLOW='255 205 35', MILL_GREEN='55 230 100';
-// Index into field_mill.png, a 3-icon sprite of solid red/yellow/green circles.
-const MILL_ICON_INDEX=[MILL_RED,MILL_YELLOW,MILL_GREEN];
 export type Kind='winds'|'fieldmills'|'lightning'|'profilers';
 export type Config={name:string;start:string;end:string;radar:string;layers:Kind[];windHeight:string;lightningMinutes:number;profilerHeight:number};
 export type Entry={name:string;text:string};
@@ -75,7 +74,7 @@ export function parse(kind:Kind,text:string):{obs:Observation[];notes:string[];t
  return {obs:unique,notes,total:rows.length};
 }
 const esc=(s:string)=>s.replace(/\\/g,'\\\\').replace(/"/g,'\\"').replace(/\r/g,'').replace(/\n/g,'\\n');
-function header(title:string,barbs=false,mills=false){return [`Title: ${title}`,'Threshold: 999','Font: 1, 13, 1, "Arial"','; UTC TimeRange. Requires GR placefile v1.5 support; verify in GR2Analyst.',...(barbs?['IconFile: 1, 96, 96, 48, 48, "wind_barb.png"']:[]),...(mills?['IconFile: 2, 20, 20, 10, 10, "field_mill.png"']:[])];}
+function header(title:string,barbs=false){return [`Title: ${title}`,'Threshold: 999','Font: 1, 13, 1, "Arial"','; UTC TimeRange. Requires GR placefile v1.5 support; verify in GR2Analyst.',...(barbs?['IconFile: 1, 96, 96, 48, 48, "wind_barb.png"']:[])];}
 function display(o:Observation,kind:Kind,millColor?:string){
  let hover=`${o.site}\nObservation: ${iso(o.time)}\n`;const out=[`Object: ${o.lat}, ${o.lon}`];
  if(kind==='winds'||kind==='profilers'){
@@ -90,8 +89,8 @@ function display(o:Observation,kind:Kind,millColor?:string){
  } else if(kind==='fieldmills'){
   const v=o.value!;
   const status=millColor===MILL_RED?'At or above 1000 V/m magnitude':millColor===MILL_YELLOW?'Below 1000 V/m; a threshold reading occurred within the last 15 minutes':'Below 1000 V/m; no threshold reading in the available last 15 minutes';
-  const color=millColor||MILL_GREEN,full=esc(hover+`1-min mean: ${v} V/m\n${status}`);
-  out.push(`Icon: 0, 0, 0, 2, ${MILL_ICON_INDEX.indexOf(color)}, "${full}"`,`Color: ${color}`,`Text: 0, -14, 1, "${Math.round(v)}", "${full}"`);
+  const color=millColor||MILL_GREEN,full=hover+`1-min mean: ${v} V/m\n${status}`;
+  out.push(...circleSymbol(color,4,full),`Color: ${color}`,`Text: 0, -14, 1, "${Math.round(v)}", "${esc(full)}"`);
  }else out.push(`Color: ${o.type==='CG'?'255 210 80':'120 210 255'}`,`Text: 0, 0, 1, "${o.type==='CG'?'+':'x'}", "${esc(hover+o.type+(o.value!==undefined?`\nPeak current: ${o.value} kA`:''))}"`);
  out.push('End:');return out;
 }
@@ -131,10 +130,11 @@ export function generate(kind:Kind,obs:Observation[],c:Config,notes:string[]=[])
   }
  }
  frames.sort((x,y)=>x.start-y.start);
- const lines=header(`Replay / ${kind}${kind==='winds'?' / '+c.windHeight:kind==='profilers'?' / '+c.profilerHeight+'m AGL':''}`,kind==='winds'||kind==='profilers',kind==='fieldmills');
+ const lines=header(`Replay / ${kind}${kind==='winds'?' / '+c.windHeight:kind==='profilers'?' / '+c.profilerHeight+'m AGL':''}`,kind==='winds'||kind==='profilers');
+ if(kind==='fieldmills')lines.push(...circleFonts(4));
  const intervals:[number,number][]=[];for(const f of frames){lines.push(`TimeRange: ${grtime(f.start)} ${grtime(f.end)}`,...display(f.o,kind,f.millColor));const last=intervals[intervals.length-1];if(last&&f.start<=last[1])last[1]=Math.max(last[1],f.end);else intervals.push([f.start,f.end]);}
  const report:Report={kind,records:obs.length,plotted:frames.length,first:frames.length?iso(frames.reduce((m,f)=>Math.min(m,f.o.time),Infinity)):null,last:frames.length?iso(frames.reduce((m,f)=>Math.max(m,f.o.time),-Infinity)):null,sites:new Set(frames.map(f=>f.o.site)).size,notes:[...notes,`Maximum display age: ${hold/MIN} minutes; no future observations and no interpolation.`],intervals};
- if(kind==='fieldmills')report.notes.push('Solid circle icons labeled with the rounded 1-minute mean (V/m): red when |E| >= 1000 V/m; otherwise yellow until 15 minutes after the most recent threshold observation at that mill, then green. Gaps do not create observations or prove a clear period.');
+ if(kind==='fieldmills')report.notes.push('Opaque circles labeled with the rounded 1-minute mean (V/m): red when |E| >= 1000 V/m; otherwise yellow until 15 minutes after the most recent threshold observation at that mill, then green. Gaps do not create observations or prove a clear period.');
  if(kind==='profilers')report.notes.push(`Nearest height to ${c.profilerHeight} m AGL within 250 m; the actual height is labeled.`);
  if(!frames.length)report.notes.push('No plottable data overlaps this window and layer selection.');
  return {entry:{name:`placefiles/${kind}.txt`,text:lines.join('\n')+'\n'},report};

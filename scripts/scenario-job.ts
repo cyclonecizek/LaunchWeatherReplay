@@ -10,8 +10,7 @@ import { pathToFileURL, fileURLToPath } from 'node:url';
 import { BUCKET, radarFiles, kscURL, readLimited } from '../lib/archive';
 import { FIELD_MILL_RECOVERY_MINUTES, validate, csv, parse, generate, probe, type Config, type Observation, type RadarFile } from '../lib/replay';
 import { merlinRequests, fetchMerlin, cgHeader, cgParts, ccParts, DensityWindow } from '../lib/merlin';
-import barbSprite from '../lib/barb-data.json';
-import millSprite from '../lib/fieldmill-data.json';
+import sprite from '../lib/barb-data.json';
 
 const MAX_BYTES = 2_000_000_000;
 const MIN = 60_000;
@@ -40,10 +39,10 @@ export function configFromEnv(env: Record<string, string | undefined>): Config {
 }
 
 export function instructions(c: Config, missing: string[]) {
-  return `LAUNCH WEATHER REPLAY\r\n${c.start} to ${c.end} (UTC, end exclusive)\r\nRadar: ${c.radar}\r\n\r\n${missing.length ? 'PARTIAL SCENARIO: ' + missing.join('; ') : 'Selected archive requests completed. Check coverage below and in manifest.json.'}\r\n\r\nOPEN IN GR2ANALYST\r\n1. Extract this ZIP completely to a permanent folder.\r\n2. For wind and field-mill icons, run FIX_ICON_PATHS.cmd after extraction or moving the folder. If scripts are unavailable, open the placefile in a text editor and replace wind_barb.png or field_mill.png in its IconFile line with the full Windows path, inside the quotes.\r\n3. Stop live polling in GR, then use File > Open to load radar/${c.radar}/. Set the loop frame count to cover the volumes.\r\n4. In Placefile Manager add placefiles/replay_clock_check.txt first. Step forward, backward and pause; confirm the displayed clock follows the archived radar time.\r\n5. Add the other placefiles. Times are UTC; no running website is needed during replay.\r\n\r\nGR2Analyst 3.0, 3.2 and 3.4 require verification on the installed application. TimeRange-based playback is implemented but has not been tested in GR here. A valid ZIP does not establish GR compatibility.\r\n\r\nTIME RULES\r\nTowers expire after 7 minutes and field mills after 2 minutes, or earlier when replaced. No future observations or interpolation. MERLIN CG detections persist for ${c.lightningMinutes} minutes; CC uses approximately 1 km cells with counts from [frame time minus trail, frame time), refreshed each minute. Counts are detections, not independently identified flashes. Field mills use small solid circle icons labeled with the rounded 1-minute mean: red when absolute field is at least 1000 V/m; below that threshold, yellow if this mill had a threshold observation in the previous 15 minutes, otherwise green. The archive request includes that history before the scenario starts. Circles disappear when the latest reading is over two minutes old. CC cells use solid, outlined dots at cell centers: blue 1-4, cyan 5-19, green 20-49, yellow 50-99, orange 100-249, red 250+ detections. Details are on hover, with no CC map caption. Colors are display categories, not launch criteria.\r\n\r\nRaw CSVs are used temporarily to create the placefiles and are not included. Radar Level II bytes are retained unchanged. manifest.json records source URLs, hashes and coverage notes. Successful requests do not prove complete sensor-network coverage. Profilers are not included.\r\n`;
+  return `LAUNCH WEATHER REPLAY\r\n${c.start} to ${c.end} (UTC, end exclusive)\r\nRadar: ${c.radar}\r\n\r\n${missing.length ? 'PARTIAL SCENARIO: ' + missing.join('; ') : 'Selected archive requests completed. Check coverage below and in manifest.json.'}\r\n\r\nOPEN IN GR2ANALYST\r\n1. Extract this ZIP completely to a permanent folder.\r\n2. For wind icons, run FIX_ICON_PATHS.cmd after extraction or moving the folder. If scripts are unavailable, open placefiles/winds.txt in a text editor and replace wind_barb.png in the IconFile line with its full Windows path, inside the quotes.\r\n3. Stop live polling in GR, then use File > Open to load radar/${c.radar}/. Set the loop frame count to cover the volumes.\r\n4. In Placefile Manager add placefiles/replay_clock_check.txt first. Step forward, backward and pause; confirm the displayed clock follows the archived radar time.\r\n5. Add the other placefiles. Times are UTC; no running website is needed during replay.\r\n\r\nGR2Analyst 3.0, 3.2 and 3.4 require verification on the installed application. TimeRange-based playback is implemented but has not been tested in GR here. A valid ZIP does not establish GR compatibility.\r\n\r\nTIME RULES\r\nTowers expire after 7 minutes and field mills after 2 minutes, or earlier when replaced. No future observations or interpolation. MERLIN CG detections persist for ${c.lightningMinutes} minutes; CC uses approximately 1 km cells with counts from [frame time minus trail, frame time), refreshed each minute. Counts are detections, not independently identified flashes. Field mills use small solid circles: red when absolute field is at least 1000 V/m; below that threshold, yellow if this mill had a threshold observation in the previous 15 minutes, otherwise green. The archive request includes that history before the scenario starts. Circles disappear when the latest reading is over two minutes old. CC cells use solid, outlined dots at cell centers: blue 1-4, cyan 5-19, green 20-49, yellow 50-99, orange 100-249, red 250+ detections. Details are on hover, with no CC map caption. Colors are display categories, not launch criteria.\r\n\r\nRaw CSVs are used temporarily to create the placefiles and are not included. Radar Level II bytes are retained unchanged. manifest.json records source URLs, hashes and coverage notes. Successful requests do not prove complete sensor-network coverage. Profilers are not included.\r\n`;
 }
 
-export const iconFix = '@echo off\r\nset "REPLAY_ROOT=%~dp0"\r\npowershell -NoProfile -Command "$dir=Join-Path $env:REPLAY_ROOT \'placefiles\'; $windIcon=Join-Path $dir \'wind_barb.png\'; $millIcon=Join-Path $dir \'field_mill.png\'; Get-ChildItem -LiteralPath $dir -Filter \'*.txt\' | ForEach-Object { $s=[IO.File]::ReadAllText($_.FullName); $s=[regex]::Replace($s, \'(?m)^IconFile: 1, 96, 96, 48, 48, .*$\', (\'IconFile: 1, 96, 96, 48, 48, \'+[char]34+$windIcon+[char]34)); $s=[regex]::Replace($s, \'(?m)^IconFile: 2, 20, 20, 10, 10, .*$\', (\'IconFile: 2, 20, 20, 10, 10, \'+[char]34+$millIcon+[char]34)); [IO.File]::WriteAllText($_.FullName,$s,(New-Object Text.UTF8Encoding($false))) }; Write-Host \'Icon paths updated.\'"\r\npause\r\n';
+export const iconFix = '@echo off\r\nset "REPLAY_ROOT=%~dp0"\r\npowershell -NoProfile -Command "$dir=Join-Path $env:REPLAY_ROOT \'placefiles\'; $icon=Join-Path $dir \'wind_barb.png\'; Get-ChildItem -LiteralPath $dir -Filter \'*.txt\' | ForEach-Object { $s=[IO.File]::ReadAllText($_.FullName); $s=[regex]::Replace($s, \'(?m)^IconFile: 1, 96, 96, 48, 48, .*$\', (\'IconFile: 1, 96, 96, 48, 48, \'+[char]34+$icon+[char]34)); [IO.File]::WriteAllText($_.FullName,$s,(New-Object Text.UTF8Encoding($false))) }; Write-Host \'Icon paths updated.\'"\r\npause\r\n';
 
 // Stream both generated text and radar to disk. The entire archive is never a JS string or buffer.
 export async function writeParts(path: string, parts: Iterable<string> | AsyncIterable<string>, charge: (n: number) => void) {
@@ -146,17 +145,11 @@ export async function buildScenario(c: Config, root: string, allowPartial = fals
     }
   }
   if (missing.length && !allowPartial) throw Error('Selected layers unavailable: ' + missing.join('; ') + '. Enable Allow partial only if you want the remaining data.');
-  const windsOk = c.layers.includes('winds') && !missing.some(s => s.startsWith('winds:'));
-  const millsOk = c.layers.includes('fieldmills') && !missing.some(s => s.startsWith('fieldmills:'));
-  if (windsOk) {
-    const icon = Buffer.from(barbSprite, 'base64'); charge(icon.length);
+  if (c.layers.includes('winds') && !missing.some(s => s.startsWith('winds:'))) {
+    const icon = Buffer.from(sprite, 'base64'); charge(icon.length);
     await writeFile(join(root, 'placefiles/wind_barb.png'), icon);
+    await save('FIX_ICON_PATHS.cmd', iconFix);
   }
-  if (millsOk) {
-    const icon = Buffer.from(millSprite, 'base64'); charge(icon.length);
-    await writeFile(join(root, 'placefiles/field_mill.png'), icon);
-  }
-  if (windsOk || millsOk) await save('FIX_ICON_PATHS.cmd', iconFix);
   await save('placefiles/replay_clock_check.txt', probe(radar, c).text);
   for (const [i, file] of radar.entries()) {
     console.log(`Radar volume ${i + 1}/${radar.length}: ${file.key.split('/').pop()}`);
