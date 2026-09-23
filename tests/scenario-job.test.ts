@@ -28,7 +28,7 @@ test('completed scenario ZIP has radar, synchronized layers, icons and no raw CS
     if (url.includes('/MerlinCloudTo')) return new Response('Date,Time,Latitude,Longitude,Signal Strength\n06/25/2024,21:00:00,28.5,-80.6,0\n');
     throw Error('Unexpected request: ' + url);
   };
-  const env = { SCENARIO_START: '2024-06-25T21:00', SCENARIO_END: '2024-06-25T21:02', SCENARIO_TRAIL: '1', SCENARIO_OUTPUT: output };
+  const env = { SCENARIO_START: '2024-06-25T21:00', SCENARIO_END: '2024-06-25T21:02', SCENARIO_TRAIL: '1', SCENARIO_WINDS: 'true', SCENARIO_OUTPUT: output };
   try {
     const zip = await run(env);
     assert(requested.includes(kscURL('fieldmills', 0, '2024-06-25T20:45Z', '2024-06-25T21:02Z')), 'Retrieval must include the 15-minute field-mill history');

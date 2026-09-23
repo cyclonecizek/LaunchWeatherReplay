@@ -32,9 +32,9 @@ on:
         required: true
         default: 'KMLB'
       winds:
-        description: 'Include wind towers'
+        description: 'Include wind towers (temporarily off by default)'
         type: boolean
-        default: true
+        default: false
       fieldmills:
         description: 'Include field mills'
         type: boolean
@@ -52,7 +52,7 @@ on:
         description: 'Lightning trail in minutes'
         type: choice
         options: ['1', '5', '10', '15', '30', '45', '60']
-        default: '60'
+        default: '30'
       allow_partial:
         description: 'Allow a clearly labeled partial package if a KSC layer fails'
         type: boolean

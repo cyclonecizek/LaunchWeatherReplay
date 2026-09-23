@@ -50,16 +50,16 @@ export default function Home() {
             <label>Radar identifier<Input maxLength={4} value={radar} onChange={(e) => update(() => setRadar(e.target.value.toUpperCase()))} placeholder="KMLB" spellCheck={false} /></label>
             <p className="note">KMLB is Melbourne NEXRAD. Times use 24-hour UTC. If the start moves to or beyond the end, the end automatically moves one hour later. Windows may be up to 12 hours and 2 GB per package.</p>
             <h2 style={{ marginTop: 28 }}><span className="step">02</span> Choose local observations</h2>
-            <div className="notice">Radar, wind towers, field mills, and MERLIN lightning are retrieved automatically for the window below — no account or manual download needed.</div>
+            <div className="notice">Radar, field mills, and MERLIN lightning are retrieved automatically for the window below — no account or manual download needed.</div>
             {layers.map((layer) => {
               const checked = selected.includes(layer.key);
               return (
                 <div className="source" key={layer.key}>
                   <div className="source-head">
-                    <Checkbox id={layer.key} checked={checked} onCheckedChange={(v) => update(() => setSelected(v ? [...selected, layer.key] : selected.filter((k) => k !== layer.key)))} />
+                    <Checkbox id={layer.key} checked={checked} disabled={!!layer.disabledReason} onCheckedChange={(v) => update(() => setSelected(v ? [...selected, layer.key] : selected.filter((k) => k !== layer.key)))} />
                     <layer.icon size={18} />
                     <label htmlFor={layer.key}>{layer.name}</label>
-                    <span className="status">{uploads[layer.key]?.length ? 'FILE IMPORT' : layer.mode}</span>
+                    <span className="status">{layer.disabledReason || (uploads[layer.key]?.length ? 'FILE IMPORT' : layer.mode)}</span>
                   </div>
                   <p>{layer.detail}</p>
                   {checked && (

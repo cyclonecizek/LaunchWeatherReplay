@@ -28,9 +28,9 @@ export function configFromEnv(env: Record<string, string | undefined>): Config {
     end: normalize(env.SCENARIO_END || '2024-06-25T21:30'),
     radar: (env.SCENARIO_RADAR || 'KMLB').trim().toUpperCase(),
     layers: [], windHeight: env.SCENARIO_WIND_HEIGHT || '54',
-    lightningMinutes: Number(env.SCENARIO_TRAIL || '60'), profilerHeight: 1000,
+    lightningMinutes: Number(env.SCENARIO_TRAIL || '30'), profilerHeight: 1000,
   };
-  if (bool(env.SCENARIO_WINDS, true)) c.layers.push('winds');
+  if (bool(env.SCENARIO_WINDS, false)) c.layers.push('winds');
   if (bool(env.SCENARIO_FIELDMILLS, true)) c.layers.push('fieldmills');
   if (bool(env.SCENARIO_MERLIN, true)) c.layers.push('lightning');
   const { a, b } = validate(c);
