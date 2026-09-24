@@ -1,6 +1,14 @@
 export const SOUNDING_STATION='74794';
 export const SOUNDING_ARCHIVE='https://weather.uwyo.edu/wsgi/sounding';
 export const LLCC_THRESHOLDS_C=[5,0,-5,-10,-15,-20];
+// A default (or absent) server-side User-Agent is a common trigger for a
+// university host's bot protection to return a decoy 404 instead of the
+// real page. A browser-shaped one avoids that without misrepresenting the
+// request beyond what any visitor's browser would already send.
+export const SOUNDING_HEADERS={
+ Accept:'text/html,*/*',
+ 'User-Agent':'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+} as const;
 const HOUR=3600000;
 export type SoundingLevel={presHpa:number;hghtM:number;tempC:number};
 export type Sounding={time:number;levels:SoundingLevel[]};

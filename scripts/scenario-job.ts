@@ -10,7 +10,7 @@ import { pathToFileURL, fileURLToPath } from 'node:url';
 import { BUCKET, radarFiles, kscURL, readLimited } from '../lib/archive';
 import { FIELD_MILL_RECOVERY_MINUTES, validate, csv, parse, generate, probe, type Config, type Observation, type RadarFile } from '../lib/replay';
 import { merlinRequests, fetchMerlin, cgHeader, cgParts, ccParts, DensityWindow } from '../lib/merlin';
-import { fetchNearestSounding, soundingURL, soundingReportText } from '../lib/sounding';
+import { fetchNearestSounding, soundingURL, soundingReportText, SOUNDING_HEADERS } from '../lib/sounding';
 import sprite from '../lib/barb-data.json';
 
 const MAX_BYTES = 2_000_000_000;
@@ -155,7 +155,7 @@ export async function buildScenario(c: Config, root: string, allowPartial = fals
   try {
     console.log('Fetching nearest KXMR sounding...');
     const sounding = await fetchNearestSounding(a, async url => {
-      const r = await fetch(url, { headers: { Accept: 'text/html,*/*' }, signal: AbortSignal.timeout(15_000) });
+      const r = await fetch(url, { headers: SOUNDING_HEADERS, signal: AbortSignal.timeout(15_000) });
       if (!r.ok) {
         const body = await readLimited(r, 2000).catch(() => '');
         throw Error(`HTTP ${r.status} for ${url}${body ? `: ${body.replace(/\s+/g, ' ').trim().slice(0, 200)}` : ''}`);
