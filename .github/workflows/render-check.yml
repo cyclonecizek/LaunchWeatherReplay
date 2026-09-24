@@ -2,7 +2,7 @@ name: Verify Render server
 on:
   push:
     branches: [main]
-    paths: ['server/**', 'lib/**', 'scripts/scenario-job.ts', 'scripts/package-scenario.py', 'scripts/ksc-trust.sh', 'scripts/prepare-render.mjs', 'tests/**', 'Dockerfile.render', '.dockerignore', 'render.yaml', 'package*.json', '.github/workflows/render-check.yml']
+    paths: ['server/**', 'lib/**', 'scripts/scenario-job.ts', 'scripts/package-scenario.py', 'scripts/fetch-sounding.py', 'scripts/ksc-trust.sh', 'scripts/prepare-render.mjs', 'tests/**', 'Dockerfile.render', '.dockerignore', 'render.yaml', 'package*.json', '.github/workflows/render-check.yml']
   workflow_dispatch:
 permissions:
   contents: read

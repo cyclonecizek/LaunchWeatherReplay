@@ -98,7 +98,7 @@ independently identified flashes.
 
 ## Source provenance
 
-Station coordinates and wind icon: https://github.com/cyclonecizek/WINDS_Placefile and https://github.com/cyclonecizek/EFM_GR2_Placefile . Export token construction is adapted from the user's existing Python scripts. Source URLs and import names accompany each package. No credentials are embedded. TLS certificate verification is not disabled. `sounding_llcc.txt` is built from the University of Wyoming upper-air sounding archive (https://weather.uwyo.edu/upperair), station KXMR / 74794.
+Station coordinates and wind icon: https://github.com/cyclonecizek/WINDS_Placefile and https://github.com/cyclonecizek/EFM_GR2_Placefile . Export token construction is adapted from the user's existing Python scripts. Source URLs and import names accompany each package. No credentials are embedded. TLS certificate verification is not disabled. `sounding_llcc.txt` is built from the University of Wyoming upper-air sounding archive (https://weather.uwyo.edu/upperair), station KXMR / 74794, fetched with Unidata's siphon library (`scripts/fetch-sounding.py`) in the Render and GitHub Actions builds.
 
 ## Validation
 

@@ -7,6 +7,7 @@
 !scripts/
 !scripts/scenario-job.ts
 !scripts/package-scenario.py
+!scripts/fetch-sounding.py
 !scripts/ksc-trust.sh
 !scripts/prepare-render.mjs
 !server/

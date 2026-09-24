@@ -7,6 +7,7 @@ on:
       - '.github/workflows/build-scenario.yml'
       - 'scripts/scenario-job.ts'
       - 'scripts/package-scenario.py'
+      - 'scripts/fetch-sounding.py'
       - 'scripts/ksc-trust.sh'
       - 'tests/scenario-job.test.ts'
       - 'lib/merlin.ts'
@@ -87,6 +88,12 @@ jobs:
       - name: Validate and load the missing KSC intermediate certificate
         if: matrix.mode == 'Weather scenario' && (github.event_name == 'push' || inputs.winds || inputs.fieldmills || inputs.merlin)
         run: bash scripts/ksc-trust.sh
+      - name: Install siphon for the KXMR sounding
+        if: matrix.mode == 'Weather scenario'
+        run: |
+          python3 -m venv "$RUNNER_TEMP/siphon"
+          "$RUNNER_TEMP/siphon/bin/pip" install --quiet siphon==0.11.0
+          echo "SOUNDING_PYTHON=$RUNNER_TEMP/siphon/bin/python" >> "$GITHUB_ENV"
       - name: Retrieve data and validate ZIP
         id: scenario
         env:
