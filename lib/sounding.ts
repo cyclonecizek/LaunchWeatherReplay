@@ -39,25 +39,40 @@ export function soundingURL(spec:QuerySpec) {
  return `${SOUNDING_ARCHIVE}?src=FM35&datetime=${datetime}&id=${SOUNDING_STATION}&type=TEXT:LIST`;
 }
 
-// Each sounding in a TEXT:LIST page is one <H2>...</H2> title followed by a
-// fixed-width data <PRE> (7-char PRES/HGHT/TEMP/... columns) and a second
-// <PRE> with station indices, including "Observation time: YYMMDD/HHMM" -
-// parsed directly, so the result doesn't depend on which slot was requested.
-export function parseSoundingPage(html:string):Sounding[] {
- const out:Sounding[]=[];
- for(const block of html.split(/<H2>/i).slice(1)){
-  const pre=/<PRE>([\s\S]*?)<\/PRE>/i.exec(block);
-  const obs=/Observation time:\s*(\d{2})(\d{2})(\d{2})\/(\d{2})(\d{2})/.exec(block);
-  if(!pre||!obs)continue;
-  const [,yy,mm,dd,hh,mi]=obs;
-  const year=(Number(yy)>=70?1900:2000)+Number(yy);
-  const time=Date.UTC(year,Number(mm)-1,Number(dd),Number(hh),Number(mi));
-  const levels:SoundingLevel[]=[];
-  for(const line of pre[1].split('\n')){
-   if(line.length<21)continue;
-   const presHpa=Number(line.slice(0,7).trim()),hghtM=Number(line.slice(7,14).trim()),tempC=Number(line.slice(14,21).trim());
-   if(Number.isFinite(presHpa)&&Number.isFinite(hghtM)&&Number.isFinite(tempC))levels.push({presHpa,hghtM,tempC});
+const num=(s:string)=>s.trim()===''?NaN:Number(s);
+function parseLevels(text:string):SoundingLevel[] {
+ const fixed:SoundingLevel[]=[],loose:SoundingLevel[]=[];
+ for(const line of text.split('\n')){
+  if(line.length>=21){
+   const presHpa=num(line.slice(0,7)),hghtM=num(line.slice(7,14)),tempC=num(line.slice(14,21));
+   if(Number.isFinite(presHpa)&&Number.isFinite(hghtM)&&Number.isFinite(tempC))fixed.push({presHpa,hghtM,tempC});
   }
+  const [p,h,t]=line.trim().split(/[\s,]+/).map(Number);
+  if(Number.isFinite(p)&&Number.isFinite(h)&&Number.isFinite(t)&&p>0&&p<1100)loose.push({presHpa:p,hghtM:h,tempC:t});
+ }
+ // Fixed 7-char columns keep rows with a blank field aligned; whitespace
+ // splitting is the fallback in case the new endpoint changed the layout.
+ return fixed.length>=5?fixed:loose;
+}
+
+// The legacy TEXT:LIST page was one <H2> title per sounding, a fixed-width
+// data <PRE>, and an indices <PRE> with "Observation time: YYMMDD/HHMM". The
+// wsgi replacement returns one sounding per exact-datetime request, so when
+// the page lacks those markers, fall back to the whole page and the time
+// that was requested.
+export function parseSoundingPage(html:string,requestedTime?:number):Sounding[] {
+ const out:Sounding[]=[];
+ const blocks=/<H2>/i.test(html)?html.split(/<H2>/i).slice(1):[html];
+ for(const block of blocks){
+  const obs=/Observation time:\s*(\d{2})(\d{2})(\d{2})\/(\d{2})(\d{2})/.exec(block);
+  let time=requestedTime;
+  if(obs){
+   const [,yy,mm,dd,hh,mi]=obs;
+   time=Date.UTC((Number(yy)>=70?1900:2000)+Number(yy),Number(mm)-1,Number(dd),Number(hh),Number(mi));
+  }
+  if(time===undefined)continue;
+  const pre=/<PRE>([\s\S]*?)<\/PRE>/i.exec(block);
+  const levels=parseLevels(pre?pre[1]:block.replace(/<[^>]+>/g,'\n'));
   // A handful of stray numeric-looking header/separator rows aren't a usable sounding.
   if(levels.length>=5)out.push({time,levels:levels.sort((a,b)=>a.hghtM-b.hghtM)});
  }
@@ -66,20 +81,24 @@ export function parseSoundingPage(html:string):Sounding[] {
 export function nearestSounding(soundings:Sounding[],targetTime:number):Sounding|undefined {
  return soundings.slice().sort((a,b)=>Math.abs(a.time-targetTime)-Math.abs(b.time-targetTime))[0];
 }
-// Tries each hourly slot from the target backward, oldest attempt's error
-// kept only for the final report: a miss on most hours is normal (the
-// station only actually flies once or twice a day), not a failure.
+// Tries each hourly slot from the target backward. A failed request on most
+// hours is normal (the station only flies a few times a day), so those are
+// kept only for the final report. A page that loaded but couldn't be parsed
+// is different - it means the data is there and the parser is wrong - so it
+// takes priority over the trailing 404s in the error.
 export async function fetchNearestSounding(targetTime:number,fetchText:(url:string)=>Promise<string>,lookbackHours=12):Promise<Sounding> {
- let lastError:unknown;
+ let lastError:unknown,unreadable:string|undefined;
  for(const spec of soundingQuerySpecs(targetTime,lookbackHours)){
-  let soundings:Sounding[];
-  try{soundings=parseSoundingPage(await fetchText(soundingURL(spec)));}
+  const url=soundingURL(spec);
+  let html:string;
+  try{html=await fetchText(url);}
   catch(e){lastError=e;continue;}
-  const sounding=nearestSounding(soundings,targetTime);
+  const sounding=nearestSounding(parseSoundingPage(html,spec.time),targetTime);
   if(sounding)return sounding;
+  unreadable??=`${url} loaded but had no readable sounding. Page begins: ${html.replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim().slice(0,300)}`;
  }
- const detail=lastError instanceof Error?lastError.message:undefined;
- throw Error(`No ${SOUNDING_STATION} (KXMR) sounding was found in the ${lookbackHours} hours before the requested time.${detail?` Last attempt: ${detail}`:''}`);
+ const detail=unreadable??(lastError instanceof Error?`Last attempt: ${lastError.message}`:undefined);
+ throw Error(`No ${SOUNDING_STATION} (KXMR) sounding was found in the ${lookbackHours} hours before the requested time.${detail?` ${detail}`:''}`);
 }
 
 // First bottom-up crossing of each threshold, linearly interpolated between
