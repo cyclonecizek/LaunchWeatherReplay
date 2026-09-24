@@ -7,11 +7,16 @@ import { execFileSync } from 'node:child_process';
 import { configFromEnv, run, writeParts } from '../scripts/scenario-job';
 import { BUCKET, kscURL } from '../lib/archive';
 
-function soundingFixture(yy: string, mm: string, dd: string, hh: string, mi: string, rows: [number, number, number][]) {
-  const col = (n: number) => n.toFixed(1).padStart(7);
-  const data = rows.map(([p, h, t]) => col(p) + col(h) + col(t)).join('\n');
-  return `<H2>74794 XMR Cape Canaveral Observations at ${hh}Z ${dd} Jun 20${yy}</H2>\n<PRE>\n---\n   PRES   HGHT   TEMP\n${data}\n</PRE>\n<H3>Station information and sounding indices</H3>\n<PRE>\n                             Station number: 74794\n                           Observation time: ${yy}${mm}${dd}/${hh}${mi}\n</PRE>\n`;
+// Stand-ins for the siphon helper, called the way the build calls python3.
+async function fakeSoundingPython(dir: string, name: string, script: string) {
+  const path = join(dir, name);
+  await writeFile(path, `#!/bin/sh\n${script}\n`, { mode: 0o755 });
+  return path;
 }
+const SOUNDING_JSON = JSON.stringify({
+  time: Date.UTC(2024, 5, 25, 21), url: 'http://weather.uwyo.edu/wsgi/sounding?type=TEXT%3ACSV&datetime=2024-06-25%2021:00:00&id=74794',
+  levels: [[1013, 0, 25], [900, 1000, 15], [800, 2000, 5], [700, 3000, -5], [600, 4000, -15], [500, 5000, -25]].map(([presHpa, hghtM, tempC]) => ({ presHpa, hghtM, tempC })),
+});
 
 test('UTC validation rejects reversed dates and retains 24-hour UTC values', () => {
   assert.equal(configFromEnv({ SCENARIO_START: '2024-06-25 23:00', SCENARIO_END: '2024-06-26 00:00' }).start, '2024-06-25T23:00Z');
@@ -32,10 +37,12 @@ test('completed scenario ZIP has radar, synchronized layers, icons and no raw CS
     if (url.includes('/WeatherTower/')) return new Response('Date,Time,SiteName,Height,Average Wind Direction,Average Wind Speed\n06/25/2024,21:00:00,1,54,270,20\n');
     if (url.includes('/FieldMill/')) return new Response('Date,Time,MillNo,OneMinuteMean\n06/25/2024,21:00:00,1,-1400\n');
     if (url.includes('/MerlinCloudTo')) return new Response('Date,Time,Latitude,Longitude,Signal Strength\n06/25/2024,21:00:00,28.5,-80.6,0\n');
-    if (url.includes('weather.uwyo.edu')) return new Response(soundingFixture('24', '06', '25', '21', '00', [[1013, 0, 25], [900, 1000, 15], [800, 2000, 5], [700, 3000, -5], [600, 4000, -15], [500, 5000, -25]]));
     throw Error('Unexpected request: ' + url);
   };
-  const env = { SCENARIO_START: '2024-06-25T21:00', SCENARIO_END: '2024-06-25T21:02', SCENARIO_TRAIL: '1', SCENARIO_WINDS: 'true', SCENARIO_OUTPUT: output };
+  const bin = await mkdtemp(join(tmpdir(), 'sounding-fake-'));
+  const soundingOk = await fakeSoundingPython(bin, 'ok', `cat <<'JSON'\n${SOUNDING_JSON}\nJSON`);
+  const soundingDown = await fakeSoundingPython(bin, 'down', `echo 'Traceback noise' >&2; echo 'No 74794 sounding found in the 12 hours before 2024-06-25 21:00Z.' >&2; exit 1`);
+  const env = { SCENARIO_START: '2024-06-25T21:00', SCENARIO_END: '2024-06-25T21:02', SCENARIO_TRAIL: '1', SCENARIO_WINDS: 'true', SCENARIO_OUTPUT: output, SOUNDING_PYTHON: soundingOk };
   try {
     const zip = await run(env);
     assert(requested.includes(kscURL('fieldmills', 0, '2024-06-25T20:45Z', '2024-06-25T21:02Z')), 'Retrieval must include the 15-minute field-mill history');
@@ -57,6 +64,7 @@ with zipfile.ZipFile(sys.argv[1]) as z:
  manifest=json.loads(z.read(prefix+'manifest.json'))
  assert manifest['raw_csvs_included'] is False and not manifest['missing']
  assert 'sounding_llcc.txt included' in manifest['sounding']
+ assert any(x.get('kind')=='sounding' and 'type=TEXT%3ACSV' in x['url'] for x in manifest['sources'])
 `, zip]);
     await rm(zip);
     failRadar = true;
@@ -65,7 +73,7 @@ with zipfile.ZipFile(sys.argv[1]) as z:
     failRadar = false; failKsc = true;
     await assert.rejects(() => run(env), /HTTP 503/);
     assert.deepEqual(await readdir(output), []);
-    const partial = await run({ ...env, SCENARIO_ALLOW_PARTIAL: 'true' });
+    const partial = await run({ ...env, SCENARIO_ALLOW_PARTIAL: 'true', SOUNDING_PYTHON: soundingDown });
     assert(partial.endsWith('-PARTIAL.zip'));
     execFileSync('python3', ['-c', `import zipfile,sys,json
 with zipfile.ZipFile(sys.argv[1]) as z:
@@ -74,11 +82,11 @@ with zipfile.ZipFile(sys.argv[1]) as z:
  assert not any(n.endswith('/sounding_llcc.txt') for n in names)
  m=json.loads(z.read(next(n for n in names if n.endswith('/manifest.json'))))
  assert m['package_scope']=='partial' and len(m['missing'])==3
- assert m['sounding'].startswith('sounding_llcc.txt not included: ')
+ assert m['sounding'] == 'sounding_llcc.txt not included: No 74794 sounding found in the 12 hours before 2024-06-25 21:00Z.', m['sounding']
  readme=z.read(next(n for n in names if n.endswith('/README.txt'))).decode()
  assert 'sounding_llcc.txt not included' in readme
 `, partial]);
-  } finally { globalThis.fetch = originalFetch; await rm(output, { recursive: true, force: true }); }
+  } finally { globalThis.fetch = originalFetch; await rm(output, { recursive: true, force: true }); await rm(bin, { recursive: true, force: true }); }
 });
 
 test('observation files over 20 MB are written and compressed without a separate observation cap', async () => {

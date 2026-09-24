@@ -5,12 +5,13 @@ import { join, resolve } from 'node:path';
 import { Readable, Transform } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import { createHash } from 'node:crypto';
-import { execFileSync } from 'node:child_process';
+import { execFile, execFileSync } from 'node:child_process';
+import { promisify } from 'node:util';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 import { BUCKET, radarFiles, kscURL, readLimited } from '../lib/archive';
 import { FIELD_MILL_RECOVERY_MINUTES, validate, csv, parse, generate, probe, type Config, type Observation, type RadarFile } from '../lib/replay';
 import { merlinRequests, fetchMerlin, cgHeader, cgParts, ccParts, DensityWindow } from '../lib/merlin';
-import { fetchNearestSounding, soundingURL, soundingReportText, SOUNDING_HEADERS } from '../lib/sounding';
+import { soundingReportText, SOUNDING_STATION, type SoundingLevel } from '../lib/sounding';
 import sprite from '../lib/barb-data.json';
 
 const MAX_BYTES = 2_000_000_000;
@@ -75,7 +76,24 @@ export async function downloadRadar(file: RadarFile, path: string, charge: (n: n
   return hash.digest('hex');
 }
 
-export async function buildScenario(c: Config, root: string, allowPartial = false) {
+const execFileAsync = promisify(execFile);
+const SOUNDING_LOOKBACK_HOURS = 12;
+
+// siphon (Python) does the University of Wyoming request and parsing; this
+// only runs it and reads its JSON. Worst case is 13 hourly requests at
+// siphon-side 20 s timeouts, so 5 minutes bounds a hung archive.
+async function fetchSounding(target: number, python: string): Promise<{ time: number; url: string; levels: SoundingLevel[] }> {
+  const script = fileURLToPath(new URL('./fetch-sounding.py', import.meta.url));
+  try {
+    const { stdout } = await execFileAsync(python, [script, String(target), SOUNDING_STATION, String(SOUNDING_LOOKBACK_HOURS)], { timeout: 5 * 60_000, maxBuffer: 5_000_000 });
+    return JSON.parse(stdout);
+  } catch (e) {
+    const stderr = (e as { stderr?: string }).stderr?.trim();
+    throw Error(stderr ? stderr.split('\n').pop()! : describeError(e));
+  }
+}
+
+export async function buildScenario(c: Config, root: string, allowPartial = false, soundingPython = 'python3') {
   const { a, b } = validate(c);
   const reports: unknown[] = [], sources: unknown[] = [], missing: string[] = [];
   let bytes = 0;
@@ -154,18 +172,11 @@ export async function buildScenario(c: Config, root: string, allowPartial = fals
   let soundingNote: string;
   try {
     console.log('Fetching nearest KXMR sounding...');
-    const sounding = await fetchNearestSounding(a, async url => {
-      const r = await fetch(url, { headers: SOUNDING_HEADERS, signal: AbortSignal.timeout(15_000) });
-      if (!r.ok) {
-        const body = await readLimited(r, 2000).catch(() => '');
-        throw Error(`HTTP ${r.status} for ${url}${body ? `: ${body.replace(/\s+/g, ' ').trim().slice(0, 200)}` : ''}`);
-      }
-      return readLimited(r, 3_000_000);
-    });
+    const sounding = await fetchSounding(a, soundingPython);
     const text = soundingReportText(sounding, a);
     charge(Buffer.byteLength(text));
     await save('sounding_llcc.txt', text);
-    sources.push({ kind: 'sounding', url: soundingURL({ time: sounding.time }) });
+    sources.push({ kind: 'sounding', url: sounding.url });
     soundingNote = `sounding_llcc.txt included, nearest sounding at ${new Date(sounding.time).toISOString().slice(0, 16).replace('T', ' ')}Z.`;
   } catch (e) {
     // Non-fatal: a supplementary reference file, not a selected layer.
@@ -196,7 +207,7 @@ export async function run(env: Record<string, string | undefined> = process.env)
     let result: Awaited<ReturnType<typeof buildScenario>> | undefined;
     if (networkTest) {
       await writeFile(join(root, 'README.txt'), 'GITHUB DOWNLOAD TEST\r\n\r\nIf you can download this ZIP and open this file at your office, this GitHub artifact download path works for this test.\r\nThis is not weather data and is not a GR replay. Larger downloads and GR compatibility still require testing.\r\n');
-    } else result = await buildScenario(c!, root, bool(env.SCENARIO_ALLOW_PARTIAL, false));
+    } else result = await buildScenario(c!, root, bool(env.SCENARIO_ALLOW_PARTIAL, false), env.SOUNDING_PYTHON || 'python3');
     const filename = `${name}${result?.missing.length ? '-PARTIAL' : ''}.zip`;
     const destination = join(output, filename);
     execFileSync('python3', [fileURLToPath(new URL('./package-scenario.py', import.meta.url)), root, destination], { stdio: 'inherit' });
