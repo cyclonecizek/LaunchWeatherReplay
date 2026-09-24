@@ -21,7 +21,7 @@ test('soundingQuerySpecs only tries KXMR\'s known launch hours within the lookba
   ]);
   const url = soundingURL(specs[0]);
   assert(url.startsWith('https://weather.uwyo.edu/wsgi/sounding?'));
-  assert(url.includes('id=74794') && url.includes('type=TEXT%3ALIST') && url.includes('datetime=2024-06-25+18%3A00%3A00'));
+  assert(url.includes('src=FM35') && url.includes('id=74794') && url.includes('type=TEXT%3ALIST') && url.includes('datetime=2024-06-25+18%3A00%3A00'));
 });
 
 test('fetchNearestSounding stops at the first known-launch-hour hit, tolerating misses on the way', async () => {

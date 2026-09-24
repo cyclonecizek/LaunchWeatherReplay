@@ -26,7 +26,9 @@ export function soundingQuerySpecs(targetTime:number,lookbackHours=12):QuerySpec
 }
 export function soundingURL(spec:QuerySpec) {
  const iso=new Date(spec.time).toISOString();
- const p=new URLSearchParams({type:'TEXT:LIST',datetime:`${iso.slice(0,10)} ${iso.slice(11,19)}`,id:SOUNDING_STATION});
+ // src=FM35 (WMO TEMP report format) is required - without it the server
+ // can't identify the sounding and 404s even when the archive has data.
+ const p=new URLSearchParams({src:'FM35',datetime:`${iso.slice(0,10)} ${iso.slice(11,19)}`,id:SOUNDING_STATION,type:'TEXT:LIST'});
  return `${SOUNDING_ARCHIVE}?${p}`;
 }
 
