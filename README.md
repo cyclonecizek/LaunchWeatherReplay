@@ -36,6 +36,7 @@ The ZIP is uploaded directly, with no extra ZIP wrapped around it.
 - `placefiles/wind_barb.png` and `FIX_ICON_PATHS.cmd`: included when towers are available. Instructions also explain manually setting the icon path if scripts cannot run.
 - `README.txt`: GR setup and missing-source notes.
 - `manifest.json`: small coverage/provenance record, including source hashes; no raw CSVs.
+- `sounding_llcc.txt`: not a placefile. Lists the +5, 0, -5, -10, -15, and -20 C altitudes from the KXMR (74794) sounding nearest the scenario start, pulled from the University of Wyoming upper-air archive. Best-effort; a fetch failure omits the file without failing the rest of the package.
 
 GitHub retrieves sources and writes files to temporary disk. A standard ZIP writer
 finishes the archive, reopens it, checks every file CRC and the complete file list,
@@ -97,7 +98,7 @@ independently identified flashes.
 
 ## Source provenance
 
-Station coordinates and wind icon: https://github.com/cyclonecizek/WINDS_Placefile and https://github.com/cyclonecizek/EFM_GR2_Placefile . Export token construction is adapted from the user's existing Python scripts. Source URLs and import names accompany each package. No credentials are embedded. TLS certificate verification is not disabled.
+Station coordinates and wind icon: https://github.com/cyclonecizek/WINDS_Placefile and https://github.com/cyclonecizek/EFM_GR2_Placefile . Export token construction is adapted from the user's existing Python scripts. Source URLs and import names accompany each package. No credentials are embedded. TLS certificate verification is not disabled. `sounding_llcc.txt` is built from the University of Wyoming upper-air sounding archive (https://weather.uwyo.edu/upperair), station KXMR / 74794.
 
 ## Validation
 
@@ -105,7 +106,9 @@ Station coordinates and wind icon: https://github.com/cyclonecizek/WINDS_Placefi
 electric fields, coordinate joins, tower selection, missing-data expiry, future
 exclusion, radar key filtering, and streaming TAR assembly. `tests/merlin.test.ts`
 checks MERLIN tokens, coordinate formats, interval boundaries, trail expiry,
-subsecond times, grouped CC cells, and source hash consistency. `npm run build`
+subsecond times, grouped CC cells, and source hash consistency. `tests/sounding.test.ts`
+checks the UWyo query-window month-boundary splitting, fixed-width level parsing,
+nearest-sounding selection, and critical-altitude interpolation. `npm run build`
 creates the Worker and browser assets.
 
 ## Follow-up acceptance test

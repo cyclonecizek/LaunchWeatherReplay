@@ -7,6 +7,12 @@ import { execFileSync } from 'node:child_process';
 import { configFromEnv, run, writeParts } from '../scripts/scenario-job';
 import { BUCKET, kscURL } from '../lib/archive';
 
+function soundingFixture(yy: string, mm: string, dd: string, hh: string, mi: string, rows: [number, number, number][]) {
+  const col = (n: number) => n.toFixed(1).padStart(7);
+  const data = rows.map(([p, h, t]) => col(p) + col(h) + col(t)).join('\n');
+  return `<H2>74794 XMR Cape Canaveral Observations at ${hh}Z ${dd} Jun 20${yy}</H2>\n<PRE>\n---\n   PRES   HGHT   TEMP\n${data}\n</PRE>\n<H3>Station information and sounding indices</H3>\n<PRE>\n                             Station number: 74794\n                           Observation time: ${yy}${mm}${dd}/${hh}${mi}\n</PRE>\n`;
+}
+
 test('UTC validation rejects reversed dates and retains 24-hour UTC values', () => {
   assert.equal(configFromEnv({ SCENARIO_START: '2024-06-25 23:00', SCENARIO_END: '2024-06-26 00:00' }).start, '2024-06-25T23:00Z');
   assert.throws(() => configFromEnv({ SCENARIO_START: '2024-06-25T23:00', SCENARIO_END: '2024-06-25T21:00' }));
@@ -26,6 +32,7 @@ test('completed scenario ZIP has radar, synchronized layers, icons and no raw CS
     if (url.includes('/WeatherTower/')) return new Response('Date,Time,SiteName,Height,Average Wind Direction,Average Wind Speed\n06/25/2024,21:00:00,1,54,270,20\n');
     if (url.includes('/FieldMill/')) return new Response('Date,Time,MillNo,OneMinuteMean\n06/25/2024,21:00:00,1,-1400\n');
     if (url.includes('/MerlinCloudTo')) return new Response('Date,Time,Latitude,Longitude,Signal Strength\n06/25/2024,21:00:00,28.5,-80.6,0\n');
+    if (url.includes('weather.uwyo.edu')) return new Response(soundingFixture('24', '06', '25', '21', '00', [[1013, 0, 25], [900, 1000, 15], [800, 2000, 5], [700, 3000, -5], [600, 4000, -15], [500, 5000, -25]]));
     throw Error('Unexpected request: ' + url);
   };
   const env = { SCENARIO_START: '2024-06-25T21:00', SCENARIO_END: '2024-06-25T21:02', SCENARIO_TRAIL: '1', SCENARIO_WINDS: 'true', SCENARIO_OUTPUT: output };
@@ -37,12 +44,14 @@ with zipfile.ZipFile(sys.argv[1]) as z:
  assert z.testzip() is None
  names=z.namelist()
  assert not any(n.endswith('.csv') or '/raw/' in n for n in names)
- expected={'README.txt','manifest.json','FIX_ICON_PATHS.cmd','placefiles/wind_barb.png','placefiles/winds.txt','placefiles/fieldmills.txt','placefiles/merlin_cg.txt','placefiles/merlin_cc_density.txt','placefiles/replay_clock_check.txt','radar/KMLB/KMLB20240625_210000_V06'}
+ expected={'README.txt','manifest.json','FIX_ICON_PATHS.cmd','placefiles/wind_barb.png','placefiles/winds.txt','placefiles/fieldmills.txt','placefiles/merlin_cg.txt','placefiles/merlin_cc_density.txt','placefiles/replay_clock_check.txt','sounding_llcc.txt','radar/KMLB/KMLB20240625_210000_V06'}
  assert {'/'.join(n.split('/')[1:]) for n in names} == expected
  prefix=names[0].split('/')[0]+'/'
  assert z.read(prefix+'radar/KMLB/KMLB20240625_210000_V06') == b'AR2V0006 fixture bytes for transfer-integrity test only'
  assert b'-1400' in z.read(prefix+'placefiles/fieldmills.txt')
  assert b'TimeRange: 2024-06-25T21:00:00' in z.read(prefix+'placefiles/merlin_cg.txt')
+ sounding=z.read(prefix+'sounding_llcc.txt').decode()
+ assert '74794' in sounding and '2000' in sounding and '4500' in sounding
  manifest=json.loads(z.read(prefix+'manifest.json'))
  assert manifest['raw_csvs_included'] is False and not manifest['missing']
 `, zip]);
