@@ -6,7 +6,10 @@ export async function GET(req:Request){try{
  const specs=soundingQuerySpecs(target);
  const pages=await Promise.all(specs.map(async s=>{
   const r=await fetch(soundingURL(s),{headers:{Accept:'text/html,*/*'},signal:AbortSignal.timeout(30000)});
-  if(!r.ok)throw Error(`Sounding archive returned HTTP ${r.status}. Automatic retrieval did not complete.`);
+  if(!r.ok){
+   const body=await readLimited(r,2000).catch(()=>'');
+   throw Error(`Sounding archive returned HTTP ${r.status} for ${soundingURL(s)}${body?`: ${body.replace(/\s+/g,' ').trim().slice(0,200)}`:''}. Automatic retrieval did not complete.`);
+  }
   return parseSoundingPage(await readLimited(r,3_000_000));
  }));
  const sounding=nearestSounding(pages.flat(),target);
