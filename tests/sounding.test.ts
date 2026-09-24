@@ -44,6 +44,25 @@ test('fetchNearestSounding reports the last error when nothing is found in the l
   );
 });
 
+test('fetchNearestSounding reports a page that loaded but could not be parsed, not the trailing 404s', async () => {
+  const target = Date.UTC(2024, 5, 28, 16, 0);
+  await assert.rejects(
+    fetchNearestSounding(target, async url => {
+      if (url.includes('datetime=2024-06-28%2015:00:00')) return '<html><body>Some new layout the parser does not know</body></html>';
+      throw Error(`HTTP 404 for ${url}`);
+    }, 3),
+    /datetime=2024-06-28%2015:00:00&id=74794&type=TEXT:LIST loaded but had no readable sounding\. Page begins: Some new layout/,
+  );
+});
+
+test('parseSoundingPage falls back to the requested time and whitespace columns when the legacy markers are absent', () => {
+  const html = '<html><pre>\n PRES HGHT TEMP\n hPa m C\n1013.0 3 26.0\n850.0 1500 16.0\n700.0 3150 7.0\n500.0 5850 -8.0\n400.0 7500 -18.0\n</pre></html>';
+  const [sounding] = parseSoundingPage(html, Date.UTC(2024, 5, 28, 15, 0));
+  assert.equal(sounding.time, Date.UTC(2024, 5, 28, 15, 0));
+  assert.deepEqual(sounding.levels.map(l => l.tempC), [26, 16, 7, -8, -18]);
+  assert.deepEqual(parseSoundingPage(html), []);
+});
+
 test('parseSoundingPage reads the fixed-width levels and observation time', () => {
   const html = fixture('24', '06', '25', '12', '00', LAPSE);
   const [sounding] = parseSoundingPage(html);
