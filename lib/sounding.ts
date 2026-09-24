@@ -23,10 +23,12 @@ export function soundingQuerySpecs(targetTime:number,lookbackHours=12):QuerySpec
 }
 export function soundingURL(spec:QuerySpec) {
  const iso=new Date(spec.time).toISOString();
- // src=FM35 (WMO TEMP report format) is required - without it the server
- // can't identify the sounding and 404s even when the archive has data.
- const p=new URLSearchParams({src:'FM35',datetime:`${iso.slice(0,10)} ${iso.slice(11,19)}`,id:SOUNDING_STATION,type:'TEXT:LIST'});
- return `${SOUNDING_ARCHIVE}?${p}`;
+ // Built to match a confirmed-working URL byte for byte - literal colons in
+ // "datetime" and "type", not percent-encoded (%3A). This WSGI endpoint
+ // appears to 404 on the standard-encoded form, so don't route this through
+ // URLSearchParams/encodeURIComponent, which would encode those colons.
+ const datetime=`${iso.slice(0,10)}%20${iso.slice(11,19)}`;
+ return `${SOUNDING_ARCHIVE}?src=FM35&datetime=${datetime}&id=${SOUNDING_STATION}&type=TEXT:LIST`;
 }
 
 // Each sounding in a TEXT:LIST page is one <H2>...</H2> title followed by a

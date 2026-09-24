@@ -19,7 +19,7 @@ test('soundingQuerySpecs walks backward hour by hour from the target, capped to 
   assert.equal(specs[12].time, Date.UTC(2024, 5, 25, 9, 0));
   const url = soundingURL(specs[0]);
   assert(url.startsWith('https://weather.uwyo.edu/wsgi/sounding?'));
-  assert(url.includes('src=FM35') && url.includes('id=74794') && url.includes('type=TEXT%3ALIST') && url.includes('datetime=2024-06-25+21%3A00%3A00'));
+  assert(url.includes('src=FM35') && url.includes('id=74794') && url.includes('type=TEXT:LIST') && url.includes('datetime=2024-06-25%2021:00:00'));
 });
 
 test('fetchNearestSounding stops at the first hourly hit walking backward, tolerating misses on the way', async () => {
@@ -29,7 +29,7 @@ test('fetchNearestSounding stops at the first hourly hit walking backward, toler
   let calls = 0;
   const sounding = await fetchNearestSounding(target, async url => {
     calls++;
-    if (url.includes('datetime=2024-06-25+10%3A00%3A00')) return html;
+    if (url.includes('datetime=2024-06-25%2010:00:00')) return html;
     throw Error(`HTTP 404 for ${url}`);
   });
   assert.equal(sounding.time, Date.UTC(2024, 5, 25, 10, 0));
