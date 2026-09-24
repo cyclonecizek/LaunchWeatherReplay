@@ -10,7 +10,7 @@ import { pathToFileURL, fileURLToPath } from 'node:url';
 import { BUCKET, radarFiles, kscURL, readLimited } from '../lib/archive';
 import { FIELD_MILL_RECOVERY_MINUTES, validate, csv, parse, generate, probe, type Config, type Observation, type RadarFile } from '../lib/replay';
 import { merlinRequests, fetchMerlin, cgHeader, cgParts, ccParts, DensityWindow } from '../lib/merlin';
-import { soundingQuerySpecs, soundingURL, parseSoundingPage, nearestSounding, soundingReportText } from '../lib/sounding';
+import { fetchNearestSounding, soundingURL, soundingReportText } from '../lib/sounding';
 import sprite from '../lib/barb-data.json';
 
 const MAX_BYTES = 2_000_000_000;
@@ -154,17 +154,14 @@ export async function buildScenario(c: Config, root: string, allowPartial = fals
   let soundingNote: string;
   try {
     console.log('Fetching nearest KXMR sounding...');
-    const specs = soundingQuerySpecs(a);
-    const pages = await Promise.all(specs.map(async s => {
-      const r = await fetch(soundingURL(s), { headers: { Accept: 'text/html,*/*' }, signal: AbortSignal.timeout(30_000) });
+    const sounding = await fetchNearestSounding(a, async url => {
+      const r = await fetch(url, { headers: { Accept: 'text/html,*/*' }, signal: AbortSignal.timeout(15_000) });
       if (!r.ok) {
         const body = await readLimited(r, 2000).catch(() => '');
-        throw Error(`Sounding archive returned HTTP ${r.status} for ${soundingURL(s)}${body ? `: ${body.replace(/\s+/g, ' ').trim().slice(0, 200)}` : ''}.`);
+        throw Error(`HTTP ${r.status} for ${url}${body ? `: ${body.replace(/\s+/g, ' ').trim().slice(0, 200)}` : ''}`);
       }
-      return parseSoundingPage(await readLimited(r, 3_000_000));
-    }));
-    const sounding = nearestSounding(pages.flat(), a);
-    if (!sounding) throw Error('No KXMR (74794) sounding was found within 24 hours of the scenario start.');
+      return readLimited(r, 3_000_000);
+    });
     const text = soundingReportText(sounding, a);
     charge(Buffer.byteLength(text));
     await save('sounding_llcc.txt', text);

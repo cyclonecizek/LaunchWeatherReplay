@@ -1,7 +1,7 @@
 export const SOUNDING_STATION='74794';
 export const SOUNDING_ARCHIVE='https://weather.uwyo.edu/wsgi/sounding';
 export const LLCC_THRESHOLDS_C=[5,0,-5,-10,-15,-20];
-const MIN=60000,HOUR=3600000,SLOT=12*HOUR;
+const HOUR=3600000;
 export type SoundingLevel={presHpa:number;hghtM:number;tempC:number};
 export type Sounding={time:number;levels:SoundingLevel[]};
 // UWyo's cgi-bin/sounding archive was retired; the wsgi/sounding replacement
@@ -9,12 +9,15 @@ export type Sounding={time:number;levels:SoundingLevel[]};
 export type QuerySpec={time:number};
 export type CriticalAltitude={thresholdC:number;altitudeM:number|null;altitudeFt:number|null};
 
-// Radiosondes launch at 00Z and 12Z; enumerate those slots covering the window
-// so at least one request lands on the scenario's actual nearest sounding.
-export function soundingQuerySpecs(targetTime:number,windowHours=24):QuerySpec[] {
- const from=targetTime-windowHours*HOUR,to=targetTime+windowHours*HOUR;
+// KXMR doesn't fly on a clean 00Z/12Z schedule (its morning launch is often
+// 09Z or 10Z), and the new endpoint 404s on any datetime without an exact
+// sounding, so search backward hour by hour from the target instead of
+// guessing a fixed synoptic slot. Ordered nearest-first so callers can stop
+// at the first hit: the soonest sounding at or before the target time.
+export function soundingQuerySpecs(targetTime:number,lookbackHours=36):QuerySpec[] {
+ const start=Math.floor(targetTime/HOUR)*HOUR;
  const specs:QuerySpec[]=[];
- for(let t=Math.floor(from/SLOT)*SLOT;t<=to;t+=SLOT)specs.push({time:t});
+ for(let h=0;h<=lookbackHours;h++)specs.push({time:start-h*HOUR});
  return specs;
 }
 export function soundingURL(spec:QuerySpec) {
@@ -50,12 +53,20 @@ export function parseSoundingPage(html:string):Sounding[] {
 export function nearestSounding(soundings:Sounding[],targetTime:number):Sounding|undefined {
  return soundings.slice().sort((a,b)=>Math.abs(a.time-targetTime)-Math.abs(b.time-targetTime))[0];
 }
-export async function fetchNearestSounding(targetTime:number,fetchText:(url:string)=>Promise<string>):Promise<Sounding> {
- const specs=soundingQuerySpecs(targetTime);
- const pages=await Promise.all(specs.map(async s=>parseSoundingPage(await fetchText(soundingURL(s)))));
- const sounding=nearestSounding(pages.flat(),targetTime);
- if(!sounding)throw Error(`No ${SOUNDING_STATION} (KXMR) sounding was found within 24 hours of the requested time.`);
- return sounding;
+// Tries each hourly slot from the target backward, oldest attempt's error
+// kept only for the final report: a miss on most hours is normal (the
+// station only actually flies once or twice a day), not a failure.
+export async function fetchNearestSounding(targetTime:number,fetchText:(url:string)=>Promise<string>,lookbackHours=36):Promise<Sounding> {
+ let lastError:unknown;
+ for(const spec of soundingQuerySpecs(targetTime,lookbackHours)){
+  let soundings:Sounding[];
+  try{soundings=parseSoundingPage(await fetchText(soundingURL(spec)));}
+  catch(e){lastError=e;continue;}
+  const sounding=nearestSounding(soundings,targetTime);
+  if(sounding)return sounding;
+ }
+ const detail=lastError instanceof Error?lastError.message:undefined;
+ throw Error(`No ${SOUNDING_STATION} (KXMR) sounding was found in the ${lookbackHours} hours before the requested time.${detail?` Last attempt: ${detail}`:''}`);
 }
 
 // First bottom-up crossing of each threshold, linearly interpolated between
