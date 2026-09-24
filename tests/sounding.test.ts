@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { soundingQuerySpecs, soundingURL, parseSoundingPage, nearestSounding, criticalAltitudes, soundingReportText, type SoundingLevel } from '../lib/sounding';
+import { soundingQuerySpecs, soundingURL, parseSoundingPage, nearestSounding, fetchNearestSounding, criticalAltitudes, soundingReportText, type SoundingLevel } from '../lib/sounding';
 
 function fixture(yy: string, mm: string, dd: string, hh: string, mi: string, rows: [number, number, number][]) {
   const col = (n: number) => n.toFixed(1).padStart(7);
@@ -10,18 +10,38 @@ function fixture(yy: string, mm: string, dd: string, hh: string, mi: string, row
 // A clean 10 C/1000 m lapse rate makes every threshold crossing land at a round, hand-checkable altitude.
 const LAPSE: [number, number, number][] = [[1013, 0, 25], [900, 1000, 15], [800, 2000, 5], [700, 3000, -5], [600, 4000, -15], [500, 5000, -25]];
 
-test('soundingQuerySpecs enumerates the 00Z/12Z synoptic slots covering the window', () => {
-  const specs = soundingQuerySpecs(Date.UTC(2024, 5, 25, 21, 0));
-  assert.deepEqual(specs.map(s => s.time), [
-    Date.UTC(2024, 5, 24, 12, 0),
-    Date.UTC(2024, 5, 25, 0, 0),
-    Date.UTC(2024, 5, 25, 12, 0),
-    Date.UTC(2024, 5, 26, 0, 0),
-    Date.UTC(2024, 5, 26, 12, 0),
-  ]);
+test('soundingQuerySpecs walks backward hour by hour from the target', () => {
+  const target = Date.UTC(2024, 5, 25, 21, 0);
+  const specs = soundingQuerySpecs(target, 36);
+  assert.equal(specs.length, 37);
+  assert.equal(specs[0].time, target);
+  assert.equal(specs[1].time, target - 3_600_000);
+  assert.equal(specs[36].time, Date.UTC(2024, 5, 24, 9, 0));
   const url = soundingURL(specs[0]);
   assert(url.startsWith('https://weather.uwyo.edu/wsgi/sounding?'));
-  assert(url.includes('id=74794') && url.includes('type=TEXT%3ALIST') && url.includes('datetime=2024-06-24+12%3A00%3A00'));
+  assert(url.includes('id=74794') && url.includes('type=TEXT%3ALIST') && url.includes('datetime=2024-06-25+21%3A00%3A00'));
+});
+
+test('fetchNearestSounding stops at the first hourly hit walking backward, tolerating misses on the way', async () => {
+  const target = Date.UTC(2024, 5, 25, 21, 0);
+  // KXMR's actual morning launch, an hour that isn't a clean synoptic slot.
+  const html = fixture('24', '06', '25', '10', '00', LAPSE);
+  let calls = 0;
+  const sounding = await fetchNearestSounding(target, async url => {
+    calls++;
+    if (url.includes('datetime=2024-06-25+10%3A00%3A00')) return html;
+    throw Error(`HTTP 404 for ${url}`);
+  });
+  assert.equal(sounding.time, Date.UTC(2024, 5, 25, 10, 0));
+  assert.equal(calls, 12); // 21:00 down through 10:00, inclusive, one hour at a time
+});
+
+test('fetchNearestSounding reports the last error when nothing is found in the lookback window', async () => {
+  const target = Date.UTC(2024, 5, 25, 21, 0);
+  await assert.rejects(
+    fetchNearestSounding(target, async url => { throw Error(`HTTP 404 for ${url}`); }, 2),
+    /No 74794 \(KXMR\) sounding was found in the 2 hours before the requested time\. Last attempt: HTTP 404 for/,
+  );
 });
 
 test('parseSoundingPage reads the fixed-width levels and observation time', () => {
