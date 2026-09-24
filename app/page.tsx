@@ -148,6 +148,7 @@ export default function Home() {
                 <ul className="files">
                   <li><span>radar/</span> original Level II files</li>
                   <li><span>placefiles/</span> selected layers + clock check</li>
+                  <li><span>sounding_llcc.txt</span> KXMR isotherm altitudes</li>
                   <li><span>manifest.json</span> time rules & missing data</li>
                   <li><span>README.txt</span> GR loading instructions</li>
                 </ul>

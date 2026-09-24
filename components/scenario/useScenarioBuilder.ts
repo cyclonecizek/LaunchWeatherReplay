@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import { generate, parse, probe, templates, validate, type Config, type Kind, type Observation } from '@/lib/replay';
 import { merlinEntries, merlinRequests, type MerlinChunk, type MerlinSource } from '@/lib/merlin';
 import { KSC_MIN_YEAR, KSC_MAX_YEAR } from '@/lib/archive';
+import { soundingReportText } from '@/lib/sounding';
 import { layers, type Prepared } from './layers';
 import { addMinutes } from './format';
 
@@ -201,6 +202,16 @@ export function useScenarioBuilder() {
       }
       if (controller.signal.aborted) throw new DOMException('Cancelled', 'AbortError');
       result.entries.push(probe(result.radar, c));
+      try {
+        setStatus('Fetching nearest KXMR sounding…');
+        const soundingResp = await api('/api/sounding', { time: String(a) }, controller.signal);
+        const text = soundingReportText(soundingResp.sounding, a);
+        result.entries.push({ name: 'sounding_llcc.txt', text });
+        result.sources.push({ kind: 'sounding', source: 'https://weather.uwyo.edu/upperair (KXMR 74794)' });
+      } catch (e) {
+        if (controller.signal.aborted) throw e;
+        issues.push(`KXMR sounding: ${e instanceof Error ? e.message : 'Unable to fetch the nearest sounding.'}`);
+      }
       if (result.entries.filter((e) => e.name.startsWith('placefiles/')).reduce((n, e) => n + e.text.length, 0) > 20e6)
         throw Error('Observation files exceed 20 MB. Choose a shorter window.');
       setPrepared(result);
