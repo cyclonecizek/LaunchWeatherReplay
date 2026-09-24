@@ -9,15 +9,19 @@ export type Sounding={time:number;levels:SoundingLevel[]};
 export type QuerySpec={time:number};
 export type CriticalAltitude={thresholdC:number;altitudeM:number|null;altitudeFt:number|null};
 
-// KXMR doesn't fly on a clean 00Z/12Z schedule (its morning launch is often
-// 09Z or 10Z), and the new endpoint 404s on any datetime without an exact
-// sounding, so search backward hour by hour from the target instead of
-// guessing a fixed synoptic slot. Ordered nearest-first so callers can stop
-// at the first hit: the soonest sounding at or before the target time.
-export function soundingQuerySpecs(targetTime:number,lookbackHours=36):QuerySpec[] {
+// KXMR's actual launch schedule, not the standard 00Z/12Z synoptic hours;
+// the new endpoint 404s on any datetime without an exact sounding, so only
+// these known hours are worth trying. Ordered nearest-first, capped to a
+// short lookback, so callers stop at the first hit without hammering the
+// archive: the soonest sounding at or before the target time.
+const KXMR_LAUNCH_HOURS_UTC=[18,15,12,9,0];
+export function soundingQuerySpecs(targetTime:number,lookbackHours=12):QuerySpec[] {
  const start=Math.floor(targetTime/HOUR)*HOUR;
  const specs:QuerySpec[]=[];
- for(let h=0;h<=lookbackHours;h++)specs.push({time:start-h*HOUR});
+ for(let h=0;h<=lookbackHours;h++){
+  const t=start-h*HOUR;
+  if(KXMR_LAUNCH_HOURS_UTC.includes(new Date(t).getUTCHours()))specs.push({time:t});
+ }
  return specs;
 }
 export function soundingURL(spec:QuerySpec) {
@@ -56,7 +60,7 @@ export function nearestSounding(soundings:Sounding[],targetTime:number):Sounding
 // Tries each hourly slot from the target backward, oldest attempt's error
 // kept only for the final report: a miss on most hours is normal (the
 // station only actually flies once or twice a day), not a failure.
-export async function fetchNearestSounding(targetTime:number,fetchText:(url:string)=>Promise<string>,lookbackHours=36):Promise<Sounding> {
+export async function fetchNearestSounding(targetTime:number,fetchText:(url:string)=>Promise<string>,lookbackHours=12):Promise<Sounding> {
  let lastError:unknown;
  for(const spec of soundingQuerySpecs(targetTime,lookbackHours)){
   let soundings:Sounding[];
