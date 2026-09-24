@@ -1,10 +1,10 @@
 import { readLimited } from '@/lib/archive';
-import { fetchNearestSounding } from '@/lib/sounding';
+import { fetchNearestSounding, SOUNDING_HEADERS } from '@/lib/sounding';
 export async function GET(req:Request){try{
  const target=Number(new URL(req.url).searchParams.get('time'));
  if(!Number.isFinite(target))throw Error('Missing or invalid sounding target time.');
  const sounding=await fetchNearestSounding(target,async url=>{
-  const r=await fetch(url,{headers:{Accept:'text/html,*/*'},signal:AbortSignal.timeout(15000)});
+  const r=await fetch(url,{headers:SOUNDING_HEADERS,signal:AbortSignal.timeout(15000)});
   if(!r.ok){
    const body=await readLimited(r,2000).catch(()=>'');
    throw Error(`HTTP ${r.status} for ${url}${body?`: ${body.replace(/\s+/g,' ').trim().slice(0,200)}`:''}`);
