@@ -52,8 +52,11 @@ with zipfile.ZipFile(sys.argv[1]) as z:
  assert b'TimeRange: 2024-06-25T21:00:00' in z.read(prefix+'placefiles/merlin_cg.txt')
  sounding=z.read(prefix+'sounding_llcc.txt').decode()
  assert '74794' in sounding and '2000' in sounding and '4500' in sounding
+ readme=z.read(prefix+'README.txt').decode()
+ assert 'sounding_llcc.txt included' in readme
  manifest=json.loads(z.read(prefix+'manifest.json'))
  assert manifest['raw_csvs_included'] is False and not manifest['missing']
+ assert 'sounding_llcc.txt included' in manifest['sounding']
 `, zip]);
     await rm(zip);
     failRadar = true;
@@ -68,8 +71,12 @@ with zipfile.ZipFile(sys.argv[1]) as z:
 with zipfile.ZipFile(sys.argv[1]) as z:
  names=z.namelist()
  assert not any('/merlin_' in n or n.endswith('/winds.txt') or n.endswith('/fieldmills.txt') for n in names)
+ assert not any(n.endswith('/sounding_llcc.txt') for n in names)
  m=json.loads(z.read(next(n for n in names if n.endswith('/manifest.json'))))
  assert m['package_scope']=='partial' and len(m['missing'])==3
+ assert m['sounding'].startswith('sounding_llcc.txt not included: ')
+ readme=z.read(next(n for n in names if n.endswith('/README.txt'))).decode()
+ assert 'sounding_llcc.txt not included' in readme
 `, partial]);
   } finally { globalThis.fetch = originalFetch; await rm(output, { recursive: true, force: true }); }
 });

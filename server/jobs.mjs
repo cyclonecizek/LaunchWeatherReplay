@@ -107,7 +107,7 @@ export class JobQueue {
     return { id: j.id, state: j.state, message: j.message, createdAt: j.createdAt,
       start: j.env.SCENARIO_START, end: j.env.SCENARIO_END, radar: j.env.SCENARIO_RADAR,
       position: j.state === 'queued' ? queue.findIndex(x => x.id === id) + 1 : null,
-      filename: j.filename, size: j.size, missing: j.missing, radarVolumes: j.radarVolumes, expiresAt: j.expiresAt };
+      filename: j.filename, size: j.size, missing: j.missing, radarVolumes: j.radarVolumes, sounding: j.sounding, expiresAt: j.expiresAt };
   }
   download(id) {
     const j = this.jobs.get(id);
@@ -148,7 +148,7 @@ export class JobQueue {
         if (!/^[A-Za-z0-9-]+\.zip$/.test(result.filename)) throw Error('Invalid output filename.');
         const s = statSync(join(directory, 'output', result.filename));
         if (!s.isFile() || s.size !== result.size || s.size < 22 || s.size > 2_000_000_000) throw Error('The completed ZIP failed its size check.');
-        Object.assign(job, { filename: result.filename, size: result.size, missing: result.missing, radarVolumes: result.radarVolumes,
+        Object.assign(job, { filename: result.filename, size: result.size, missing: result.missing, radarVolumes: result.radarVolumes, sounding: result.sounding,
           state: 'complete', message: result.missing.length ? 'Partial ZIP ready. Review the missing sources below.' : 'ZIP ready. All archive entries passed integrity checks.', expiresAt: Date.now() + this.retentionMs });
       } catch (e) {
         job.state = 'failed'; job.message = e.message.slice(-2000);

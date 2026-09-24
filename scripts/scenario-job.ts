@@ -39,8 +39,8 @@ export function configFromEnv(env: Record<string, string | undefined>): Config {
   return c;
 }
 
-export function instructions(c: Config, missing: string[]) {
-  return `LAUNCH WEATHER REPLAY\r\n${c.start} to ${c.end} (UTC, end exclusive)\r\nRadar: ${c.radar}\r\n\r\n${missing.length ? 'PARTIAL SCENARIO: ' + missing.join('; ') : 'Selected archive requests completed. Check coverage below and in manifest.json.'}\r\n\r\nOPEN IN GR2ANALYST\r\n1. Extract this ZIP completely to a permanent folder.\r\n2. For wind icons, run FIX_ICON_PATHS.cmd after extraction or moving the folder. If scripts are unavailable, open placefiles/winds.txt in a text editor and replace wind_barb.png in the IconFile line with its full Windows path, inside the quotes.\r\n3. Stop live polling in GR, then use File > Open to load radar/${c.radar}/. Set the loop frame count to cover the volumes.\r\n4. In Placefile Manager add placefiles/replay_clock_check.txt first. Step forward, backward and pause; confirm the displayed clock follows the archived radar time.\r\n5. Add the other placefiles. Times are UTC; no running website is needed during replay.\r\n\r\nGR2Analyst 3.0, 3.2 and 3.4 require verification on the installed application. TimeRange-based playback is implemented but has not been tested in GR here. A valid ZIP does not establish GR compatibility.\r\n\r\nTIME RULES\r\nTowers expire after 7 minutes and field mills after 2 minutes, or earlier when replaced. No future observations or interpolation. MERLIN CG detections persist for ${c.lightningMinutes} minutes; CC uses approximately 1 km cells with counts from [frame time minus trail, frame time), refreshed each minute. Counts are detections, not independently identified flashes. Field mills use small solid circles: red when absolute field is at least 1000 V/m; below that threshold, yellow if this mill had a threshold observation in the previous 15 minutes, otherwise green. The archive request includes that history before the scenario starts. Circles disappear when the latest reading is over two minutes old. CC cells use solid, outlined dots at cell centers: blue 1-4, cyan 5-19, green 20-49, yellow 50-99, orange 100-249, red 250+ detections. Details are on hover, with no CC map caption. Colors are display categories, not launch criteria.\r\n\r\nRaw CSVs are used temporarily to create the placefiles and are not included. Radar Level II bytes are retained unchanged. manifest.json records source URLs, hashes and coverage notes. Successful requests do not prove complete sensor-network coverage. Profilers are not included.\r\n\r\nSOUNDING\r\nsounding_llcc.txt, when present, lists the +5, 0, -5, -10, -15 and -20 C altitudes from the KXMR (74794) sounding nearest the scenario start, from the University of Wyoming upper-air archive. Not an official range product; not a placefile.\r\n`;
+export function instructions(c: Config, missing: string[], soundingNote = 'sounding_llcc.txt not attempted.') {
+  return `LAUNCH WEATHER REPLAY\r\n${c.start} to ${c.end} (UTC, end exclusive)\r\nRadar: ${c.radar}\r\n\r\n${missing.length ? 'PARTIAL SCENARIO: ' + missing.join('; ') : 'Selected archive requests completed. Check coverage below and in manifest.json.'}\r\n\r\nOPEN IN GR2ANALYST\r\n1. Extract this ZIP completely to a permanent folder.\r\n2. For wind icons, run FIX_ICON_PATHS.cmd after extraction or moving the folder. If scripts are unavailable, open placefiles/winds.txt in a text editor and replace wind_barb.png in the IconFile line with its full Windows path, inside the quotes.\r\n3. Stop live polling in GR, then use File > Open to load radar/${c.radar}/. Set the loop frame count to cover the volumes.\r\n4. In Placefile Manager add placefiles/replay_clock_check.txt first. Step forward, backward and pause; confirm the displayed clock follows the archived radar time.\r\n5. Add the other placefiles. Times are UTC; no running website is needed during replay.\r\n\r\nGR2Analyst 3.0, 3.2 and 3.4 require verification on the installed application. TimeRange-based playback is implemented but has not been tested in GR here. A valid ZIP does not establish GR compatibility.\r\n\r\nTIME RULES\r\nTowers expire after 7 minutes and field mills after 2 minutes, or earlier when replaced. No future observations or interpolation. MERLIN CG detections persist for ${c.lightningMinutes} minutes; CC uses approximately 1 km cells with counts from [frame time minus trail, frame time), refreshed each minute. Counts are detections, not independently identified flashes. Field mills use small solid circles: red when absolute field is at least 1000 V/m; below that threshold, yellow if this mill had a threshold observation in the previous 15 minutes, otherwise green. The archive request includes that history before the scenario starts. Circles disappear when the latest reading is over two minutes old. CC cells use solid, outlined dots at cell centers: blue 1-4, cyan 5-19, green 20-49, yellow 50-99, orange 100-249, red 250+ detections. Details are on hover, with no CC map caption. Colors are display categories, not launch criteria.\r\n\r\nRaw CSVs are used temporarily to create the placefiles and are not included. Radar Level II bytes are retained unchanged. manifest.json records source URLs, hashes and coverage notes. Successful requests do not prove complete sensor-network coverage. Profilers are not included.\r\n\r\nSOUNDING\r\nsounding_llcc.txt, when present, lists the +5, 0, -5, -10, -15 and -20 C altitudes from the KXMR (74794) sounding nearest the scenario start, from the University of Wyoming upper-air archive. Not an official range product; not a placefile. This build: ${soundingNote}\r\n`;
 }
 
 export const iconFix = '@echo off\r\nset "REPLAY_ROOT=%~dp0"\r\npowershell -NoProfile -Command "$dir=Join-Path $env:REPLAY_ROOT \'placefiles\'; $icon=Join-Path $dir \'wind_barb.png\'; Get-ChildItem -LiteralPath $dir -Filter \'*.txt\' | ForEach-Object { $s=[IO.File]::ReadAllText($_.FullName); $s=[regex]::Replace($s, \'(?m)^IconFile: 1, 96, 96, 48, 48, .*$\', (\'IconFile: 1, 96, 96, 48, 48, \'+[char]34+$icon+[char]34)); [IO.File]::WriteAllText($_.FullName,$s,(New-Object Text.UTF8Encoding($false))) }; Write-Host \'Icon paths updated.\'"\r\npause\r\n';
@@ -151,6 +151,7 @@ export async function buildScenario(c: Config, root: string, allowPartial = fals
     await writeFile(join(root, 'placefiles/wind_barb.png'), icon);
     await save('FIX_ICON_PATHS.cmd', iconFix);
   }
+  let soundingNote: string;
   try {
     console.log('Fetching nearest KXMR sounding...');
     const specs = soundingQuerySpecs(a);
@@ -165,8 +166,10 @@ export async function buildScenario(c: Config, root: string, allowPartial = fals
     charge(Buffer.byteLength(text));
     await save('sounding_llcc.txt', text);
     sources.push({ kind: 'sounding', url: soundingURL(specs[0]) });
+    soundingNote = `sounding_llcc.txt included, nearest sounding at ${new Date(sounding.time).toISOString().slice(0, 16).replace('T', ' ')}Z.`;
   } catch (e) {
     // Non-fatal: a supplementary reference file, not a selected layer.
+    soundingNote = `sounding_llcc.txt not included: ${describeError(e)}`;
     console.log(`Unavailable sounding: ${describeError(e)}`);
   }
   await save('placefiles/replay_clock_check.txt', probe(radar, c).text);
@@ -175,10 +178,10 @@ export async function buildScenario(c: Config, root: string, allowPartial = fals
     const sha256 = await downloadRadar(file, join(root, 'radar', c.radar, file.key.split('/').pop()!), charge);
     sources.push({ kind: 'radar', url: BUCKET + file.key, size: file.size, sha256 });
   }
-  await save('README.txt', instructions(c, missing));
+  await save('README.txt', instructions(c, missing, soundingNote));
   // Written only after every required transfer has succeeded. No raw data directory is created.
-  await save('manifest.json', JSON.stringify({ config: c, raw_csvs_included: false, package_scope: missing.length ? 'partial' : 'selected_sources', missing, reports, sources, radar, gr_compatibility: 'UNVERIFIED: run replay_clock_check.txt in the installed GR build' }, null, 2));
-  return { missing, radarVolumes: radar.length, bytes };
+  await save('manifest.json', JSON.stringify({ config: c, raw_csvs_included: false, package_scope: missing.length ? 'partial' : 'selected_sources', missing, sounding: soundingNote, reports, sources, radar, gr_compatibility: 'UNVERIFIED: run replay_clock_check.txt in the installed GR build' }, null, 2));
+  return { missing, radarVolumes: radar.length, bytes, soundingNote };
 }
 
 export async function run(env: Record<string, string | undefined> = process.env) {
@@ -199,7 +202,7 @@ export async function run(env: Record<string, string | undefined> = process.env)
     execFileSync('python3', [fileURLToPath(new URL('./package-scenario.py', import.meta.url)), root, destination], { stdio: 'inherit' });
     const size = (await stat(destination)).size;
     // The public server publishes a download only after packaging and CRC checks finish.
-    if (env.SCENARIO_RESULT_PATH) await writeFile(env.SCENARIO_RESULT_PATH, JSON.stringify({ filename, size, missing: result?.missing || [], radarVolumes: result?.radarVolumes || 0 }));
+    if (env.SCENARIO_RESULT_PATH) await writeFile(env.SCENARIO_RESULT_PATH, JSON.stringify({ filename, size, missing: result?.missing || [], radarVolumes: result?.radarVolumes || 0, sounding: result?.soundingNote || '' }));
     if (env.GITHUB_OUTPUT) await appendFile(env.GITHUB_OUTPUT, `archive=${destination}\nfilename=${filename}\n`);
     if (env.GITHUB_STEP_SUMMARY) await appendFile(env.GITHUB_STEP_SUMMARY, `## ${networkTest ? 'Office download test' : 'GR scenario ready'}\n\nZIP built and every entry checked for CRC integrity. Download **${filename}** under Artifacts on this run. Extract once.\n\n${(size / 1e6).toFixed(2)} MB. ${result ? `${result.radarVolumes} radar volumes. Raw CSVs excluded. ${result.missing.length ? 'PARTIAL: check README.txt for missing sources.' : 'Selected archive requests completed.'}` : 'No weather data is included in this network test.'}\n`);
     return destination;
