@@ -37,6 +37,7 @@ function render(job) {
   $('job-window').textContent = `${job.radar} · ${utc(job.start)} to ${utc(job.end)}`;
   const pending = ['queued', 'running'].includes(job.state); busy(pending); $('progress').hidden = !pending;
   $('another').hidden = pending; $('download').hidden = job.state !== 'complete'; $('expiry').textContent = '';
+  $('sounding').textContent = job.state === 'complete' ? job.sounding || '' : '';
   $('missing').replaceChildren(); $('missing').hidden = !job.missing?.length;
   for (const message of job.missing || []) { const li = document.createElement('li'); li.textContent = message; $('missing').append(li); }
   if (job.state === 'complete') {
