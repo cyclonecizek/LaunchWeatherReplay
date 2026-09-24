@@ -158,14 +158,14 @@ export async function buildScenario(c: Config, root: string, allowPartial = fals
     const pages = await Promise.all(specs.map(async s => {
       const r = await fetch(soundingURL(s), { headers: { Accept: 'text/html,*/*' }, signal: AbortSignal.timeout(30_000) });
       if (!r.ok) throw Error(`Sounding archive returned HTTP ${r.status}.`);
-      return parseSoundingPage(await readLimited(r, 3_000_000), s);
+      return parseSoundingPage(await readLimited(r, 3_000_000));
     }));
     const sounding = nearestSounding(pages.flat(), a);
     if (!sounding) throw Error('No KXMR (74794) sounding was found within 24 hours of the scenario start.');
     const text = soundingReportText(sounding, a);
     charge(Buffer.byteLength(text));
     await save('sounding_llcc.txt', text);
-    sources.push({ kind: 'sounding', url: soundingURL(specs[0]) });
+    sources.push({ kind: 'sounding', url: soundingURL({ time: sounding.time }) });
     soundingNote = `sounding_llcc.txt included, nearest sounding at ${new Date(sounding.time).toISOString().slice(0, 16).replace('T', ' ')}Z.`;
   } catch (e) {
     // Non-fatal: a supplementary reference file, not a selected layer.

@@ -1,47 +1,41 @@
 export const SOUNDING_STATION='74794';
-export const SOUNDING_ARCHIVE='https://weather.uwyo.edu/cgi-bin/sounding';
+export const SOUNDING_ARCHIVE='https://weather.uwyo.edu/wsgi/sounding';
 export const LLCC_THRESHOLDS_C=[5,0,-5,-10,-15,-20];
-const MIN=60000,HOUR=3600000;
+const MIN=60000,HOUR=3600000,SLOT=12*HOUR;
 export type SoundingLevel={presHpa:number;hghtM:number;tempC:number};
 export type Sounding={time:number;levels:SoundingLevel[]};
-export type QuerySpec={year:number;month:number;fromDDHH:string;toDDHH:string};
+// UWyo's cgi-bin/sounding archive was retired; the wsgi/sounding replacement
+// takes one exact synoptic launch time per request instead of a FROM/TO range.
+export type QuerySpec={time:number};
 export type CriticalAltitude={thresholdC:number;altitudeM:number|null;altitudeFt:number|null};
-const pad2=(n:number)=>String(n).padStart(2,'0');
 
-// UWyo's FROM/TO are day+hour within one explicit YEAR/MONTH; split a wider
-// window into one query per calendar month it touches.
+// Radiosondes launch at 00Z and 12Z; enumerate those slots covering the window
+// so at least one request lands on the scenario's actual nearest sounding.
 export function soundingQuerySpecs(targetTime:number,windowHours=24):QuerySpec[] {
  const from=targetTime-windowHours*HOUR,to=targetTime+windowHours*HOUR;
  const specs:QuerySpec[]=[];
- let cursor=Date.UTC(new Date(from).getUTCFullYear(),new Date(from).getUTCMonth(),1);
- while(cursor<=to){
-  const year=new Date(cursor).getUTCFullYear(),month=new Date(cursor).getUTCMonth();
-  const monthStart=cursor,monthEnd=Date.UTC(year,month+1,1)-MIN;
-  const segStart=Math.max(from,monthStart),segEnd=Math.min(to,monthEnd);
-  if(segStart<=segEnd){
-   const s=new Date(segStart),e=new Date(segEnd);
-   specs.push({year,month:month+1,fromDDHH:pad2(s.getUTCDate())+pad2(s.getUTCHours()),toDDHH:pad2(e.getUTCDate())+pad2(e.getUTCHours())});
-  }
-  cursor=Date.UTC(year,month+1,1);
- }
+ for(let t=Math.floor(from/SLOT)*SLOT;t<=to;t+=SLOT)specs.push({time:t});
  return specs;
 }
 export function soundingURL(spec:QuerySpec) {
- const p=new URLSearchParams({region:'naconf','TYPE':'TEXT:LIST',YEAR:String(spec.year),MONTH:pad2(spec.month),FROM:spec.fromDDHH,TO:spec.toDDHH,STNM:SOUNDING_STATION});
+ const iso=new Date(spec.time).toISOString();
+ const p=new URLSearchParams({type:'TEXT:LIST',datetime:`${iso.slice(0,10)} ${iso.slice(11,19)}`,id:SOUNDING_STATION});
  return `${SOUNDING_ARCHIVE}?${p}`;
 }
 
 // Each sounding in a TEXT:LIST page is one <H2>...</H2> title followed by a
 // fixed-width data <PRE> (7-char PRES/HGHT/TEMP/... columns) and a second
-// <PRE> with station indices, including "Observation time: YYMMDD/HHMM".
-export function parseSoundingPage(html:string,spec:QuerySpec):Sounding[] {
+// <PRE> with station indices, including "Observation time: YYMMDD/HHMM" -
+// parsed directly, so the result doesn't depend on which slot was requested.
+export function parseSoundingPage(html:string):Sounding[] {
  const out:Sounding[]=[];
  for(const block of html.split(/<H2>/i).slice(1)){
   const pre=/<PRE>([\s\S]*?)<\/PRE>/i.exec(block);
-  const obs=/Observation time:\s*\d{2}(\d{2})(\d{2})\/(\d{2})(\d{2})/.exec(block);
+  const obs=/Observation time:\s*(\d{2})(\d{2})(\d{2})\/(\d{2})(\d{2})/.exec(block);
   if(!pre||!obs)continue;
-  const [,,dd,hh,mi]=obs;
-  const time=Date.UTC(spec.year,spec.month-1,Number(dd),Number(hh),Number(mi));
+  const [,yy,mm,dd,hh,mi]=obs;
+  const year=(Number(yy)>=70?1900:2000)+Number(yy);
+  const time=Date.UTC(year,Number(mm)-1,Number(dd),Number(hh),Number(mi));
   const levels:SoundingLevel[]=[];
   for(const line of pre[1].split('\n')){
    if(line.length<21)continue;
@@ -58,7 +52,7 @@ export function nearestSounding(soundings:Sounding[],targetTime:number):Sounding
 }
 export async function fetchNearestSounding(targetTime:number,fetchText:(url:string)=>Promise<string>):Promise<Sounding> {
  const specs=soundingQuerySpecs(targetTime);
- const pages=await Promise.all(specs.map(async s=>parseSoundingPage(await fetchText(soundingURL(s)),s)));
+ const pages=await Promise.all(specs.map(async s=>parseSoundingPage(await fetchText(soundingURL(s)))));
  const sounding=nearestSounding(pages.flat(),targetTime);
  if(!sounding)throw Error(`No ${SOUNDING_STATION} (KXMR) sounding was found within 24 hours of the requested time.`);
  return sounding;

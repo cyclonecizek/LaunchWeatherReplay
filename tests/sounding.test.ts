@@ -10,20 +10,23 @@ function fixture(yy: string, mm: string, dd: string, hh: string, mi: string, row
 // A clean 10 C/1000 m lapse rate makes every threshold crossing land at a round, hand-checkable altitude.
 const LAPSE: [number, number, number][] = [[1013, 0, 25], [900, 1000, 15], [800, 2000, 5], [700, 3000, -5], [600, 4000, -15], [500, 5000, -25]];
 
-test('soundingQuerySpecs stays within one month, and splits across a month boundary', () => {
-  const single = soundingQuerySpecs(Date.UTC(2024, 5, 25, 21, 0));
-  assert.deepEqual(single, [{ year: 2024, month: 6, fromDDHH: '2421', toDDHH: '2621' }]);
-  const boundary = soundingQuerySpecs(Date.UTC(2024, 5, 30, 23, 0));
-  assert.deepEqual(boundary, [
-    { year: 2024, month: 6, fromDDHH: '2923', toDDHH: '3023' },
-    { year: 2024, month: 7, fromDDHH: '0100', toDDHH: '0123' },
+test('soundingQuerySpecs enumerates the 00Z/12Z synoptic slots covering the window', () => {
+  const specs = soundingQuerySpecs(Date.UTC(2024, 5, 25, 21, 0));
+  assert.deepEqual(specs.map(s => s.time), [
+    Date.UTC(2024, 5, 24, 12, 0),
+    Date.UTC(2024, 5, 25, 0, 0),
+    Date.UTC(2024, 5, 25, 12, 0),
+    Date.UTC(2024, 5, 26, 0, 0),
+    Date.UTC(2024, 5, 26, 12, 0),
   ]);
-  assert(soundingURL(single[0]).includes('STNM=74794') && soundingURL(single[0]).includes('YEAR=2024'));
+  const url = soundingURL(specs[0]);
+  assert(url.startsWith('https://weather.uwyo.edu/wsgi/sounding?'));
+  assert(url.includes('id=74794') && url.includes('type=TEXT%3ALIST') && url.includes('datetime=2024-06-24+12%3A00%3A00'));
 });
 
 test('parseSoundingPage reads the fixed-width levels and observation time', () => {
   const html = fixture('24', '06', '25', '12', '00', LAPSE);
-  const [sounding] = parseSoundingPage(html, { year: 2024, month: 6, fromDDHH: '2512', toDDHH: '2512' });
+  const [sounding] = parseSoundingPage(html);
   assert.equal(sounding.time, Date.UTC(2024, 5, 25, 12, 0));
   assert.equal(sounding.levels.length, 6);
   assert.deepEqual(sounding.levels.map(l => l.hghtM), [0, 1000, 2000, 3000, 4000, 5000]);
@@ -38,7 +41,7 @@ test('nearestSounding picks the closer observation time', () => {
 });
 
 test('criticalAltitudes interpolates each isotherm at the first crossing above the surface', () => {
-  const [sounding] = parseSoundingPage(fixture('24', '06', '25', '21', '00', LAPSE), { year: 2024, month: 6, fromDDHH: '2521', toDDHH: '2521' });
+  const [sounding] = parseSoundingPage(fixture('24', '06', '25', '21', '00', LAPSE));
   const rows = criticalAltitudes(sounding.levels);
   assert.deepEqual(rows.map(r => r.thresholdC), [5, 0, -5, -10, -15, -20]);
   assert.deepEqual(rows.map(r => r.altitudeM), [2000, 2500, 3000, 3500, 4000, 4500]);
@@ -57,7 +60,7 @@ test('criticalAltitudes reports "not reached" when the sounding never gets that 
 });
 
 test('soundingReportText names the station, both times, and the source', () => {
-  const [sounding] = parseSoundingPage(fixture('24', '06', '25', '12', '00', LAPSE), { year: 2024, month: 6, fromDDHH: '2512', toDDHH: '2512' });
+  const [sounding] = parseSoundingPage(fixture('24', '06', '25', '12', '00', LAPSE));
   const text = soundingReportText(sounding, Date.UTC(2024, 5, 25, 21, 0));
   assert(text.includes('74794') && text.includes('KXMR'));
   assert(text.includes('2024-06-25 12:00Z') && text.includes('2024-06-25 21:00Z'));

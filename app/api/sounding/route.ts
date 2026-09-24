@@ -7,7 +7,7 @@ export async function GET(req:Request){try{
  const pages=await Promise.all(specs.map(async s=>{
   const r=await fetch(soundingURL(s),{headers:{Accept:'text/html,*/*'},signal:AbortSignal.timeout(30000)});
   if(!r.ok)throw Error(`Sounding archive returned HTTP ${r.status}. Automatic retrieval did not complete.`);
-  return parseSoundingPage(await readLimited(r,3_000_000),s);
+  return parseSoundingPage(await readLimited(r,3_000_000));
  }));
  const sounding=nearestSounding(pages.flat(),target);
  if(!sounding)throw Error('No KXMR (74794) sounding was found within 24 hours of the requested time.');
