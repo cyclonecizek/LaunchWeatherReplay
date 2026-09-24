@@ -9,24 +9,23 @@ export type Sounding={time:number;levels:SoundingLevel[]};
 export type QuerySpec={time:number};
 export type CriticalAltitude={thresholdC:number;altitudeM:number|null;altitudeFt:number|null};
 
-// KXMR's actual launch schedule, not the standard 00Z/12Z synoptic hours;
-// the new endpoint 404s on any datetime without an exact sounding, so only
-// these known hours are worth trying. Ordered nearest-first, capped to a
-// short lookback, so callers stop at the first hit without hammering the
-// archive: the soonest sounding at or before the target time.
-const KXMR_LAUNCH_HOURS_UTC=[18,15,12,9,0];
+// KXMR doesn't fly on a clean, fixed schedule, and the new endpoint 404s on
+// any datetime without an exact sounding, so search backward hour by hour
+// from the target instead of guessing specific launch hours. Ordered
+// nearest-first and capped to a short lookback, so callers stop at the
+// first hit without hammering the archive: the soonest sounding at or
+// before the target time, and if nothing turns up within the window, stop.
 export function soundingQuerySpecs(targetTime:number,lookbackHours=12):QuerySpec[] {
  const start=Math.floor(targetTime/HOUR)*HOUR;
  const specs:QuerySpec[]=[];
- for(let h=0;h<=lookbackHours;h++){
-  const t=start-h*HOUR;
-  if(KXMR_LAUNCH_HOURS_UTC.includes(new Date(t).getUTCHours()))specs.push({time:t});
- }
+ for(let h=0;h<=lookbackHours;h++)specs.push({time:start-h*HOUR});
  return specs;
 }
 export function soundingURL(spec:QuerySpec) {
  const iso=new Date(spec.time).toISOString();
- const p=new URLSearchParams({type:'TEXT:LIST',datetime:`${iso.slice(0,10)} ${iso.slice(11,19)}`,id:SOUNDING_STATION});
+ // src=FM35 (WMO TEMP report format) is required - without it the server
+ // can't identify the sounding and 404s even when the archive has data.
+ const p=new URLSearchParams({src:'FM35',datetime:`${iso.slice(0,10)} ${iso.slice(11,19)}`,id:SOUNDING_STATION,type:'TEXT:LIST'});
  return `${SOUNDING_ARCHIVE}?${p}`;
 }
 
